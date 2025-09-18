@@ -1,0 +1,87 @@
+plugins {
+    id "java"
+    id "eclipse"
+    id "idea"
+    id "net.neoforged.moddev" version "1.0.21"
+}
+
+//Set file name.
+version = "${project.mc_version}-${project.mod_version}"
+group = project.mod_group
+archivesBaseName = project.archive_name
+
+//Options for Java version to compile to.
+java.toolchain.languageVersion = JavaLanguageVersion.of(21)
+compileJava {
+    options.compilerArgs << "-Xlint:deprecation" << "-Xlint:unchecked"
+}
+
+repositories {
+    mavenCentral()
+    // JEI maven
+    maven { url = "https://maven.blamejared.com/" }
+}
+
+//Configuration that holds jars to include in the jar
+configurations {
+    embed
+    implementation.extendsFrom(embed)
+}
+
+//NeoForge configuration
+neoForge {
+    version = project.neoforge_version
+
+    // Parchment mappings are optional, commenting out for now
+    // parchment {
+    //     mappingsVersion = project.mappings_version
+    //     minecraftVersion = project.mc_version
+    // }
+
+    runs {
+        client {
+            client()
+
+            jvmArguments.add("-Dmixin.debug.export=true")
+        }
+
+        server {
+            server()
+
+            jvmArguments.add("-Dmixin.debug.export=true")
+        }
+    }
+
+    mods {
+        register(project.mod_id) {
+            sourceSet(sourceSets.main)
+        }
+    }
+}
+
+//Specify dependencies.
+dependencies {
+    //Core to use.
+    embed project(":mccore")
+
+    //JEI API
+    compileOnly "mezz.jei:${project.jei_api_version}:api"
+    runtimeOnly "mezz.jei:${project.jei_run_version}"
+}
+
+//Here is where we zip up all embeds and add them to our jar.
+jar {
+    from {
+        configurations.embed.collect { it.isDirectory() ? it : zipTree(it) }
+    }
+
+    manifest {
+        attributes([
+                "MixinConfigs"  : project.mixin_config
+        ])
+    }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = "UTF-8"
+}
