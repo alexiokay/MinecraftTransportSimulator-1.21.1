@@ -7,11 +7,9 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockState;
-import net.neoforged.neoforge.common.capabilities.Capability;
-import net.neoforged.neoforge.common.capabilities.ForgeCapabilities;
-import net.neoforged.neoforge.common.util.LazyOptional;
+import net.neoforged.neoforge.capabilities.Capabilities;
 import net.neoforged.neoforge.energy.IEnergyStorage;
-import net.neoforged.neoforge.registries.RegistryObject;
+import java.util.function.Supplier;
 
 /**
  * Builder for tile entities that transform MC energy into power for other entities.
@@ -19,7 +17,7 @@ import net.neoforged.neoforge.registries.RegistryObject;
  * @author don_bruce
  */
 public class BuilderTileEntityEnergyCharger extends BuilderTileEntity implements IEnergyStorage {
-    protected static RegistryObject<BlockEntityType<BuilderTileEntityEnergyCharger>> TE_TYPE2;
+    protected static Supplier<BlockEntityType<BuilderTileEntityEnergyCharger>> TE_TYPE2;
 
     private ITileEntityEnergyCharger charger;
     private static final int MAX_BUFFER = 1000;
@@ -96,13 +94,5 @@ public class BuilderTileEntityEnergyCharger extends BuilderTileEntity implements
         return true;
     }
 
-    @SuppressWarnings("unchecked")
-    @Override
-    public <T> LazyOptional<T> getCapability(Capability<T> capability, Direction facing) {
-        if (capability == ForgeCapabilities.ENERGY && facing != null) {
-            return LazyOptional.of(() -> (T) this);
-        } else {
-            return super.getCapability(capability, facing);
-        }
-    }
+    // Capability registration handled by InterfaceLoader.onRegisterCapabilities()
 }

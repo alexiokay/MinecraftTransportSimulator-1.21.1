@@ -27,9 +27,8 @@ import minecrafttransportsimulator.sound.RadioStation;
 import minecrafttransportsimulator.sound.SoundInstance;
 import minecrafttransportsimulator.systems.ConfigSystem;
 import minecrafttransportsimulator.systems.LanguageSystem;
-import net.neoforged.neoforge.api.distmarker.Dist;
-import net.neoforged.neoforge.event.TickEvent.ClientTickEvent;
-import net.neoforged.neoforge.event.TickEvent.Phase;
+import net.neoforged.api.distmarker.Dist;
+import net.neoforged.neoforge.client.event.ClientTickEvent;
 import net.neoforged.neoforge.event.level.LevelEvent;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
@@ -439,24 +438,21 @@ public class InterfaceSound implements IInterfaceSound {
     /**
      * Update all sounds every client tick.
      */
-    @EventHandler
-    public static void onIVClientTick(ClientTickEvent event) {
-        //Only do updates at the end of a phase to prevent double-updates.
-        if (event.phase.equals(Phase.END)) {
-            //We put this into a try block as sound system reloads can cause the thread to get stopped mid-execution.
-            try {
-                update();
-            } catch (Exception e) {
-                e.printStackTrace();
-                //Do nothing.  We only get exceptions here if OpenAL isn't ready.
-            }
+    @SubscribeEvent
+    public static void onIVClientTick(ClientTickEvent.Post event) {
+        //We put this into a try block as sound system reloads can cause the thread to get stopped mid-execution.
+        try {
+            update();
+        } catch (Exception e) {
+            e.printStackTrace();
+            //Do nothing.  We only get exceptions here if OpenAL isn't ready.
         }
     }
 
     /**
      * Stop all sounds when the world is unloaded.
      */
-    @EventHandler
+    @SubscribeEvent
     public static void onIVWorldUnload(LevelEvent.Unload event) {
         if (event.getLevel().isClientSide()) {
             queuedSounds.removeIf(soundInstance -> event.getLevel() == ((WrapperWorld) soundInstance.entity.world).world);

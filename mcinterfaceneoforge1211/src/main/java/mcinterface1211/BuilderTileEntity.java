@@ -11,12 +11,13 @@ import minecrafttransportsimulator.mcinterface.IWrapperNBT;
 import minecrafttransportsimulator.mcinterface.IWrapperPlayer;
 import minecrafttransportsimulator.mcinterface.InterfaceManager;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockState;
 import net.neoforged.neoforge.registries.DeferredRegister;
-import net.neoforged.neoforge.registries.RegistryObject;
+import java.util.function.Supplier;
 
 /**
  * Builder for the MC Tile Entity class   This class interfaces with all the MC-specific
@@ -35,7 +36,7 @@ import net.neoforged.neoforge.registries.RegistryObject;
  */
 public class BuilderTileEntity extends BlockEntity {
     protected static final DeferredRegister<BlockEntityType<?>> TILE_ENTITIES = DeferredRegister.create(Registries.BLOCK_ENTITY_TYPE, InterfaceLoader.MODID);
-    protected static RegistryObject<BlockEntityType<BuilderTileEntity>> TE_TYPE;
+    protected static Supplier<BlockEntityType<BuilderTileEntity>> TE_TYPE;
     
     protected ATileEntityBase<?> tileEntity;
 
@@ -131,7 +132,7 @@ public class BuilderTileEntity extends BlockEntity {
                 if (!playersRequestingData.isEmpty()) {
                     for (IWrapperPlayer player : playersRequestingData) {
                         IWrapperNBT data = InterfaceManager.coreInterface.getNewNBTWrapper();
-                        saveAdditional(((WrapperNBT) data).tag);
+                        saveAdditional(((WrapperNBT) data).tag, level.registryAccess());
                         player.sendPacket(new PacketEntityCSHandshakeServer(this, data));
                     }
                     playersRequestingData.clear();
@@ -167,16 +168,16 @@ public class BuilderTileEntity extends BlockEntity {
     }
 
     @Override
-    public void load(CompoundTag tag) {
-        super.load(tag);
+    public void loadAdditional(CompoundTag tag, HolderLookup.Provider registries) {
+        super.loadAdditional(tag, registries);
         //Don't directly load the TE here.  This causes issues because Minecraft loads TEs before blocks.
         //This is horridly stupid, because then you can't get the block for the TE, but whatever, Mojang be Mojang.
         lastLoadedNBT = tag;
     }
 
     @Override
-    public void saveAdditional(CompoundTag tag) {
-        super.saveAdditional(tag);
+    public void saveAdditional(CompoundTag tag, HolderLookup.Provider registries) {
+        super.saveAdditional(tag, registries);
         if (tileEntity != null) {
             tileEntity.save(new WrapperNBT(tag));
         } else if (lastLoadedNBT != null) {

@@ -40,7 +40,7 @@ class InterfaceCore implements IInterfaceCore {
 
     @Override
     public boolean isFluidValid(String fluidID) {
-        for (ResourceLocation location : NeoForgeRegistries.FLUIDS.getKeys()) {
+        for (ResourceLocation location : BuiltInRegistries.FLUID.keySet()) {
             if (location.getPath().equals(fluidID)) {
                 return true;
             }
@@ -60,10 +60,21 @@ class InterfaceCore implements IInterfaceCore {
         String modID = resource.substring(assetsIndexEnd, modIDEnd);
         Optional<? extends ModContainer> optional = ModList.get().getModContainerById(modID);
         if (optional.isPresent()) {
-            InputStream stream = optional.get().getMod().getClass().getResourceAsStream(resource);
-            if (stream != null) {
-                return stream;
-            } else if (modID.equals(InterfaceLoader.MODID)) {
+            // In NeoForge 1.21.1, use the ModContainer's classloader directly for resource access
+            ModContainer container = optional.get();
+            // Try to load resource through the mod's classloader
+            try {
+                // First try loading through the container's mod instance if available
+                Class<?> modClass = Class.forName(container.getModInfo().getModId() + "." + container.getModInfo().getDisplayName().replaceAll("\\s+", ""));
+                InputStream stream = modClass.getResourceAsStream(resource);
+                if (stream != null) {
+                    return stream;
+                }
+            } catch (ClassNotFoundException e) {
+                // Fall through to other methods
+            }
+
+            if (modID.equals(InterfaceLoader.MODID)) {
                 //For dev builds, the core files aren't in the main jar yet and are in their own compiled one.
                 //This requires us to check a class of that jar vs the mod jar for the resource.
                 return InterfaceManager.class.getResourceAsStream(resource);
@@ -92,7 +103,7 @@ class InterfaceCore implements IInterfaceCore {
 
     @Override
     public IWrapperItemStack getStackForProperties(String name, int meta, int qty) {
-        Item item = Registries.ITEM.getValue(ResourceLocation.tryParse(name));
+        Item item = BuiltInRegistries.ITEM.get(ResourceLocation.tryParse(name));
         if (item != null) {
             return new WrapperItemStack(new ItemStack(item, qty));
         } else {
@@ -102,7 +113,7 @@ class InterfaceCore implements IInterfaceCore {
 
     @Override
     public String getStackItemName(IWrapperItemStack stack) {
-        return Registries.ITEM.getKey(((WrapperItemStack) stack).stack.getItem()).toString();
+        return BuiltInRegistries.ITEM.getKey(((WrapperItemStack) stack).stack.getItem()).toString();
     }
 
     @Override

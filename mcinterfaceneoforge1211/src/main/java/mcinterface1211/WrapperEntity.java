@@ -19,6 +19,7 @@ import minecrafttransportsimulator.mcinterface.IWrapperNBT;
 import minecrafttransportsimulator.mcinterface.IWrapperPlayer;
 import minecrafttransportsimulator.systems.ConfigSystem;
 import net.minecraft.core.Holder;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
@@ -38,6 +39,7 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.LeadItem;
 import net.minecraft.world.item.alchemy.Potion;
+import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.event.level.LevelEvent;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
@@ -180,17 +182,29 @@ public class WrapperEntity implements IWrapperEntity {
         if (riding instanceof PartSeat && !((PartSeat) riding).definition.seat.standing) {
             if (entity instanceof Animal) {
                 //Animals are moved up 0.14 pixels (~2.25), for their sitting positions.  Un-do this.
-                return entity.getMyRidingOffset() - 0.14D;
+                // In NeoForge 1.21.1, getMyRidingOffset() was removed
+                // Try using the newer passenger riding position system
+                if (entity.getVehicle() != null) {
+                    Vec3 ridingPos = entity.getVehicle().getPassengerRidingPosition(entity);
+                    // Calculate offset based on entity's position vs riding position
+                    return ridingPos.y - entity.getY();
+                }
+                return -0.14D; // Fallback to static offset for animals when sitting
             } else if (entity instanceof Villager) {
                 //Villagers get the same offset as players.
                 return (-12D / 16D) * (30D / 32D);
             } else {
-                ResourceLocation registration = Registries.ENTITY_TYPE.getKey(entity.getType());
+                ResourceLocation registration = BuiltInRegistries.ENTITY_TYPE.getKey(entity.getType());
                 if (registration != null && registration.getNamespace().equals("customnpcs")) {
                     //CNPCs seem to be offset by 3, but invert their model scaling for their sitting position.
                     return -3D / 16D * (32D / 30D);
                 } else {
-                    return entity.getMyRidingOffset();
+                    // Use the newer passenger riding position system for general entities
+                    if (entity.getVehicle() != null) {
+                        Vec3 ridingPos = entity.getVehicle().getPassengerRidingPosition(entity);
+                        return ridingPos.y - entity.getY();
+                    }
+                    return -0.14D; // Fallback to standard vanilla riding offset
                 }
             }
         }
@@ -385,7 +399,7 @@ public class WrapperEntity implements IWrapperEntity {
         Player mcPlayer = ((WrapperPlayer) player).player;
         if (entity instanceof Mob) {
             ItemStack heldStack = mcPlayer.getMainHandItem();
-            if (((Mob) entity).canBeLeashed(mcPlayer) && heldStack.getItem() instanceof LeadItem) {
+            if (((Mob) entity).canBeLeashed() && heldStack.getItem() instanceof LeadItem) {
                 ((Mob) entity).setLeashedTo(mcPlayer, true);
                 if (!mcPlayer.isCreative()) {
                     heldStack.shrink(1);
@@ -449,7 +463,8 @@ public class WrapperEntity implements IWrapperEntity {
     @Override
     public void addPotionEffect(JSONPotionEffect effect) {
         if ((entity instanceof LivingEntity)) {
-            Potion potion = Potion.byName(effect.name);
+            ResourceLocation potionLocation = ResourceLocation.fromNamespaceAndPath("minecraft", effect.name);
+            Potion potion = BuiltInRegistries.POTION.get(potionLocation);
             if (potion != null) {
                 potion.getEffects().forEach(mcEffect -> {
                     ((LivingEntity) entity).addEffect(new MobEffectInstance(mcEffect.getEffect(), effect.duration, effect.amplifier, false, false));
@@ -463,7 +478,8 @@ public class WrapperEntity implements IWrapperEntity {
     @Override
     public void removePotionEffect(JSONPotionEffect effect) {
         if ((entity instanceof LivingEntity)) {
-            Potion potion = Potion.byName(effect.name);
+            ResourceLocation potionLocation = ResourceLocation.fromNamespaceAndPath("minecraft", effect.name);
+            Potion potion = BuiltInRegistries.POTION.get(potionLocation);
             if (potion != null) {
                 potion.getEffects().forEach(mcEffect -> {
                     ((LivingEntity) entity).removeEffect(mcEffect.getEffect());
@@ -477,7 +493,7 @@ public class WrapperEntity implements IWrapperEntity {
     /**
      * Remove all entities from our maps if we unload the world.  This will cause duplicates if we don't.
      */
-    @EventHandler
+    @SubscribeEvent
     public static void onIVWorldUnload(LevelEvent.Unload event) {
         if (event.getLevel().isClientSide()) {
             entityClientWrappers.keySet().removeIf(entity1 -> event.getLevel() == entity1.level());

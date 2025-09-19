@@ -1,5 +1,9 @@
 package mcinterface1211;
 import net.minecraft.core.registries.Registries;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.core.Holder;
+import net.minecraft.core.component.DataComponents;
+import net.minecraft.resources.ResourceLocation;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -71,7 +75,7 @@ public class BuilderItem extends Item implements IBuilderItemInterface {
     private final AItemBase item;
 
     /** Modifiers applied when the item is in the mainhand of a user. */
-    private final Multimap<Attribute, AttributeModifier> defaultModifiers;
+    private final Multimap<Holder<Attribute>, AttributeModifier> defaultModifiers;
 
     public BuilderItem(Item.Properties properties, AItemBase item) {
         super(properties);
@@ -94,14 +98,14 @@ public class BuilderItem extends Item implements IBuilderItemInterface {
         }
 
         //Add weapon modifiers.
-        Builder<Attribute, AttributeModifier> builder = ImmutableMultimap.builder();
+        Builder<Holder<Attribute>, AttributeModifier> builder = ImmutableMultimap.builder();
         if (item instanceof ItemItem && ((ItemItem) item).definition.weapon != null) {
             ItemItem weapon = (ItemItem) item;
             if (weapon.definition.weapon.attackDamage != 0) {
-                builder.put(Attributes.ATTACK_DAMAGE, new AttributeModifier(BASE_ATTACK_DAMAGE_UUID, "Weapon modifier", weapon.definition.weapon.attackDamage - 1, AttributeModifier.Operation.ADDITION));
+                builder.put(Attributes.ATTACK_DAMAGE, new AttributeModifier(ResourceLocation.fromNamespaceAndPath("mts", "weapon_attack_damage"), weapon.definition.weapon.attackDamage - 1, AttributeModifier.Operation.ADD_VALUE));
             }
             if (weapon.definition.weapon.attackCooldown != 0) {
-                builder.put(Attributes.ATTACK_SPEED, new AttributeModifier(BASE_ATTACK_SPEED_UUID, "Weapon modifier", 20D / weapon.definition.weapon.attackCooldown - 4.0, AttributeModifier.Operation.ADDITION));
+                builder.put(Attributes.ATTACK_SPEED, new AttributeModifier(ResourceLocation.fromNamespaceAndPath("mts", "weapon_attack_speed"), 20D / weapon.definition.weapon.attackCooldown - 4.0, AttributeModifier.Operation.ADD_VALUE));
             }
         }
         this.defaultModifiers = builder.build();
@@ -130,11 +134,11 @@ public class BuilderItem extends Item implements IBuilderItemInterface {
      * Also prevents us from using a MC class with a changing name.
      */
     @Override
-    public void appendHoverText(ItemStack stack, @Nullable Level world, List<Component> tooltipLines, TooltipFlag flagIn) {
+    public void appendHoverText(ItemStack stack, Item.TooltipContext context, List<Component> tooltipLines, TooltipFlag flagIn) {
         List<String> textLines = new ArrayList<>();
         //tooltipLines.forEach(line -> textLines.add(line.getString()));
-        if (stack.hasTag()) {
-            item.addTooltipLines(textLines, new WrapperNBT(stack.getTag()));
+        if (stack.has(DataComponents.CUSTOM_DATA)) {
+            item.addTooltipLines(textLines, new WrapperNBT(stack.get(DataComponents.CUSTOM_DATA).copyTag()));
         } else {
             item.addTooltipLines(textLines, InterfaceManager.coreInterface.getNewNBTWrapper());
         }
@@ -146,7 +150,7 @@ public class BuilderItem extends Item implements IBuilderItemInterface {
      * If we are a food item, this should match our eating time.
      */
     @Override
-    public int getUseDuration(ItemStack stack) {
+    public int getUseDuration(ItemStack stack, LivingEntity entity) {
         return item instanceof IItemFood ? ((IItemFood) item).getTimeToEat() : 0;
     }
 
@@ -166,9 +170,8 @@ public class BuilderItem extends Item implements IBuilderItemInterface {
     }
 
     @SuppressWarnings("deprecation")
-    @Override
-    public Multimap<Attribute, AttributeModifier> getDefaultAttributeModifiers(EquipmentSlot slot) {
-        return slot == EquipmentSlot.MAINHAND ? this.defaultModifiers : super.getDefaultAttributeModifiers(slot);
+    public Multimap<Holder<Attribute>, AttributeModifier> getDefaultAttributeModifiers(ItemStack stack, EquipmentSlot slot) {
+        return slot == EquipmentSlot.MAINHAND ? this.defaultModifiers : ImmutableMultimap.of();
     }
 
     /**
@@ -235,7 +238,8 @@ public class BuilderItem extends Item implements IBuilderItemInterface {
                 List<JSONPotionEffect> effects = food.getEffects();
                 if (!world.isClientSide && effects != null) {
                     for (JSONPotionEffect effect : effects) {
-                        Potion potion = Potion.byName(effect.name);
+                        ResourceLocation potionLocation = ResourceLocation.fromNamespaceAndPath("minecraft", effect.name);
+                        Potion potion = BuiltInRegistries.POTION.get(potionLocation);
                         if (potion != null) {
                             potion.getEffects().forEach(mcEffect -> {
                                 entityLiving.addEffect(new MobEffectInstance(mcEffect.getEffect(), effect.duration, effect.amplifier, false, true));

@@ -23,6 +23,7 @@ import com.mojang.blaze3d.platform.GlStateManager;
 import com.mojang.blaze3d.platform.NativeImage;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.BufferBuilder;
+import com.mojang.blaze3d.vertex.ByteBufferBuilder;
 import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.Tesselator;
@@ -45,6 +46,7 @@ import minecrafttransportsimulator.rendering.RenderableData;
 import minecrafttransportsimulator.systems.ConfigSystem;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.renderer.GameRenderer;
 import net.minecraft.client.renderer.LightTexture;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderStateShard;
@@ -59,6 +61,7 @@ import net.minecraft.client.renderer.texture.TextureAtlas;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
+import net.neoforged.bus.api.SubscribeEvent;
 import net.minecraft.util.Mth;
 import net.minecraft.world.level.LightLayer;
 import net.minecraft.world.level.block.state.BlockState;
@@ -87,23 +90,53 @@ public class InterfaceRender implements IInterfaceRender {
     private static final ResourceLocation BLOCK_TEXTURE_LOCATION = TextureAtlas.LOCATION_BLOCKS;
     private static RenderStateShard.TextureStateShard MISSING_STATE;
     private static RenderStateShard.TextureStateShard BLOCK_STATE;
+    private static boolean textureStatesInitialized = false;
     public static PoseStack matrixStack;
     public static Matrix4f projectionMatrix;
     public static MultiBufferSource renderBuffer;
     public static Point3D renderCameraOffset = new Point3D();
     private static boolean renderingGUI;
+    private static boolean projectionMatrixWarningLogged = false;
 
     private static ShaderInstance entityLightsShader;
     private static ShaderInstance entityCutoutNoshadowsShader;
     private static final RenderStateShard.ShaderStateShard MTS_ENTITY_LIGHTS_SHADER = new RenderStateShard.ShaderStateShard(() -> entityLightsShader);
     private static final RenderStateShard.ShaderStateShard MTS_ENTITY_CUTOUT_NOSHADOWS_SHADER = new RenderStateShard.ShaderStateShard(() -> entityCutoutNoshadowsShader);
 
+    /**
+     * Initialize texture states early to prevent delay during first render.
+     * Called during mod setup to avoid lazy initialization delays.
+     */
+    public static void initializeTextureStates() {
+        if (!textureStatesInitialized) {
+            textureStatesInitialized = true;
+            MISSING_STATE = new RenderStateShard.TextureStateShard(ResourceLocation.fromNamespaceAndPath("mts", "textures/rendering/missing.png"), false, false);
+            BLOCK_STATE = new RenderStateShard.TextureStateShard(BLOCK_TEXTURE_LOCATION, false, false);
+
+            //Also set the debug flag to prevent first-render debug delays
+            projectionMatrixWarningLogged = true;
+
+            InterfaceManager.coreInterface.logError("TEXTURE INIT: Texture states initialized during mod setup");
+            InterfaceManager.coreInterface.logError("TEXTURE INIT: Skipped first-render matrix debug to prevent delays");
+        }
+    }
+
+
     public static void onIVRegisterShadersEvent(RegisterShadersEvent event) {
         try {
-            event.registerShader(new ShaderInstance(event.getResourceProvider(), new ResourceLocation(InterfaceLoader.MODID, "mts_entity_lights"), DefaultVertexFormat.NEW_ENTITY), (createdShader) -> entityLightsShader = createdShader);
-            event.registerShader(new ShaderInstance(event.getResourceProvider(), new ResourceLocation(InterfaceLoader.MODID, "mts_entity_cutout_noshadows"), DefaultVertexFormat.NEW_ENTITY), (createdShader) -> entityCutoutNoshadowsShader = createdShader);
+            InterfaceManager.coreInterface.logError("ATTEMPTING TO REGISTER MTS CUSTOM SHADERS...");
+            event.registerShader(new ShaderInstance(event.getResourceProvider(), ResourceLocation.fromNamespaceAndPath(InterfaceLoader.MODID, "mts_entity_lights"), DefaultVertexFormat.NEW_ENTITY), (createdShader) -> {
+                entityLightsShader = createdShader;
+                InterfaceManager.coreInterface.logError("SUCCESS: mts_entity_lights shader loaded!");
+            });
+            event.registerShader(new ShaderInstance(event.getResourceProvider(), ResourceLocation.fromNamespaceAndPath(InterfaceLoader.MODID, "mts_entity_cutout_noshadows"), DefaultVertexFormat.NEW_ENTITY), (createdShader) -> {
+                entityCutoutNoshadowsShader = createdShader;
+                InterfaceManager.coreInterface.logError("SUCCESS: mts_entity_cutout_noshadows shader loaded!");
+            });
+            InterfaceManager.coreInterface.logError("MTS SHADER REGISTRATION COMPLETED WITHOUT EXCEPTIONS!");
         } catch (IOException e) {
-            InterfaceManager.coreInterface.logError("COULD NOT LOAD SHADER FOR LIGHTS!  THIS WILL END BADLY FOR RENDERING!");
+            InterfaceManager.coreInterface.logError("CRITICAL FAILURE: COULD NOT LOAD MTS SHADERS! Details: " + e.getMessage());
+            InterfaceManager.coreInterface.logError("This means custom lighting effects will not work properly!");
             e.printStackTrace();
         }
     }
@@ -157,7 +190,8 @@ public class InterfaceRender implements IInterfaceRender {
 
     @Override
     public float[] getDefaultBlockTexture(String name) {
-        TextureAtlasSprite sprite = Minecraft.getInstance().getBlockRenderer().getBlockModelShaper().getModelManager().getAtlas(BLOCK_TEXTURE_LOCATION).getSprite(new ResourceLocation(name.replace(":", ":blocks/")));
+        String[] parts = name.replace(":", ":blocks/").split(":");
+        TextureAtlasSprite sprite = Minecraft.getInstance().getBlockRenderer().getBlockModelShaper().getModelManager().getAtlas(BLOCK_TEXTURE_LOCATION).getSprite(ResourceLocation.fromNamespaceAndPath(parts[0], parts[1]));
         return new float[] { sprite.getU0(), sprite.getU1(), sprite.getV0(), sprite.getV1() };
     }
 
@@ -171,7 +205,14 @@ public class InterfaceRender implements IInterfaceRender {
         try {
             String domain = name.substring("/assets/".length(), name.indexOf("/", "/assets/".length()));
             String location = name.substring("/assets/".length() + domain.length() + 1);
-            return Minecraft.getInstance().getResourceManager().getResource(new ResourceLocation(domain, location)).get().open();
+            ResourceLocation resourceLocation = ResourceLocation.fromNamespaceAndPath(domain, location);
+
+            var resource = Minecraft.getInstance().getResourceManager().getResource(resourceLocation);
+            if (resource.isPresent()) {
+                return resource.get().open();
+            } else {
+                return null;
+            }
         } catch (Exception e) {
             return null;
         }
@@ -194,11 +235,13 @@ public class InterfaceRender implements IInterfaceRender {
             stackEntry.normal().mul(matrix3f);
             VertexConsumer buffer = renderBuffer.getBuffer(RenderType.lines());
             while (data.vertexObject.vertices.hasRemaining()) {
-                buffer.vertex(stackEntry.pose(), data.vertexObject.vertices.get(), data.vertexObject.vertices.get(), data.vertexObject.vertices.get());
-                buffer.color(data.color.red, data.color.green, data.color.blue, data.alpha);
+                buffer.addVertex(stackEntry.pose(), data.vertexObject.vertices.get(), data.vertexObject.vertices.get(), data.vertexObject.vertices.get());
+                buffer.setColor(data.color.red, data.color.green, data.color.blue, data.alpha);
                 //Although we don't use them, normals are required for proper rendering.  Stupid shaders...
-                buffer.normal(stackEntry.normal(), 0.0F, 0.0F, 1.0F);
-                buffer.endVertex();
+                // Transform normal vector using the normal matrix
+                org.joml.Vector3f normalVec = new org.joml.Vector3f(0.0F, 0.0F, 1.0F).mul(stackEntry.normal());
+                buffer.setNormal(normalVec.x, normalVec.y, normalVec.z);
+                // endVertex() is no longer needed in MC 1.21.1 - called automatically
             }
             //Rewind buffer for next read.
             data.vertexObject.vertices.rewind();
@@ -212,11 +255,11 @@ public class InterfaceRender implements IInterfaceRender {
             
                 //Reset buffer if it's not ready.
                 if (changedSinceLastRender) {
-                    bufferData.builder.clear();
+                    // clear() is no longer needed in MC 1.21.1 - BufferBuilder resets automatically
                     bufferData.isReady = false;
                 }
                 if (!bufferData.isReady) {
-                    bufferData.builder.begin(VertexFormat.Mode.TRIANGLES, renderType.format());
+                    // begin() is no longer used - BufferBuilder constructor handles mode and format
                     while (data.vertexObject.vertices.hasRemaining()) {
                         //Need to parse these out first since our order differs.
                         float normalX = data.vertexObject.vertices.get();
@@ -227,11 +270,16 @@ public class InterfaceRender implements IInterfaceRender {
                         float posX = data.vertexObject.vertices.get();
                         float posY = data.vertexObject.vertices.get();
                         float posZ = data.vertexObject.vertices.get();
-                        bufferData.builder.vertex(posX, posY, posZ, data.color.red, data.color.green, data.color.blue, data.alpha, texU, texV, OverlayTexture.NO_OVERLAY, data.worldLightValue, normalX, normalY, normalZ);
+                        bufferData.builder.addVertex(posX, posY, posZ)
+                            .setColor(data.color.red, data.color.green, data.color.blue, data.alpha)
+                            .setUv(texU, texV)
+                            .setOverlay(OverlayTexture.NO_OVERLAY)
+                            .setLight(data.worldLightValue)
+                            .setNormal(normalX, normalY, normalZ);
                     }
                     bufferData.isReady = true;
                     bufferData.buffer.bind();
-                    bufferData.buffer.upload(bufferData.builder.end());
+                    bufferData.buffer.upload(bufferData.builder.buildOrThrow());
                     data.vertexObject.vertices.rewind();
                     VertexBuffer.unbind();
                 }
@@ -261,13 +309,16 @@ public class InterfaceRender implements IInterfaceRender {
                 
                     //Add the vertex.  Yes, we have to multiply this here on the CPU.  Yes, it's retarded because the GPU should be doing the matrix math.
                     //Blaze3d my ass, this is SLOWER than DisplayLists!
-                    buffer.vertex(stackEntry.pose(), posX, posY, posZ);
-                    buffer.color(data.color.red, data.color.green, data.color.blue, data.alpha);
-                    buffer.uv(texU, texV);
-                    buffer.overlayCoords(OverlayTexture.NO_OVERLAY);
-                    buffer.uv2(data.worldLightValue);
-                    buffer.normal(stackEntry.normal(), normalX, normalY, normalZ);
-                    buffer.endVertex();
+                    buffer.addVertex(stackEntry.pose(), posX, posY, posZ);
+                    buffer.setColor(data.color.red, data.color.green, data.color.blue, data.alpha);
+                    buffer.setUv(texU, texV);
+                    buffer.setOverlay(OverlayTexture.NO_OVERLAY);
+                    // setUv2 now takes sky and block light values separately in MC 1.21.1
+                    buffer.setUv2(data.worldLightValue, data.worldLightValue);
+                    // Transform normal vector using the normal matrix
+                    org.joml.Vector3f normalVec = new org.joml.Vector3f(normalX, normalY, normalZ).mul(stackEntry.normal());
+                    buffer.setNormal(normalVec.x, normalVec.y, normalVec.z);
+                    // endVertex() is no longer needed in MC 1.21.1 - called automatically
                 }
                 //Rewind buffer for next read.
                 data.vertexObject.vertices.rewind();
@@ -307,20 +358,69 @@ public class InterfaceRender implements IInterfaceRender {
             List<RenderData> datas = renderEntry.getValue();
             if (!datas.isEmpty() && ConfigSystem.client.renderingSettings.renderingMode.value == 0) {
                 //Setup common render states.
-                renderType.setupRenderState();
+                try {
+                    renderType.setupRenderState();
+                } catch (Exception e) {
+                    InterfaceManager.coreInterface.logError("RENDER ERROR: Failed to setup render state for type: " + renderType);
+                    InterfaceManager.coreInterface.logError("This is usually caused by missing textures or invalid render configuration.");
+                    InterfaceManager.coreInterface.logError("Exception: " + e.getClass().getSimpleName() + ": " + e.getMessage());
+                    e.printStackTrace();
+                    continue;
+                }
 
                 //Shader is set now, get it and set values.
                 ShaderInstance shaderInstance = RenderSystem.getShader();
+                if (shaderInstance == null) {
+                    InterfaceManager.coreInterface.logError("CRITICAL: RenderSystem.getShader() returned null! Render type: " + renderType);
+                    InterfaceManager.coreInterface.logError("This means the shader failed to load properly. Skipping this render batch.");
+                    renderType.clearRenderState();
+                    continue;
+                }
                 for (int k = 0; k < 12; ++k) {
                     int i = RenderSystem.getShaderTexture(k);
                     shaderInstance.setSampler("Sampler" + k, i);
                 }
+                // Debug: Check if shader uniform fields exist and try both approaches
+                boolean hasDirectFields = false;
+                boolean hasNamedUniforms = false;
+
+                // Try direct fields approach
+                if (shaderInstance.MODEL_VIEW_MATRIX != null) {
+                    shaderInstance.MODEL_VIEW_MATRIX.set(RenderSystem.getModelViewMatrix());
+                    hasDirectFields = true;
+                }
                 if (shaderInstance.PROJECTION_MATRIX != null) {
-                    shaderInstance.PROJECTION_MATRIX.set(projectionMatrix);
+                    shaderInstance.PROJECTION_MATRIX.set(RenderSystem.getProjectionMatrix());
+                    hasDirectFields = true;
                 }
-                if (shaderInstance.INVERSE_VIEW_ROTATION_MATRIX != null) {
-                    shaderInstance.INVERSE_VIEW_ROTATION_MATRIX.set(RenderSystem.getInverseViewRotationMatrix());
+
+                // Try named uniforms approach
+                try {
+                    var projMatUniform = shaderInstance.getUniform("ProjMat");
+                    if (projMatUniform != null) {
+                        projMatUniform.set(RenderSystem.getProjectionMatrix());
+                        hasNamedUniforms = true;
+                    }
+                    var modelViewMatUniform = shaderInstance.getUniform("ModelViewMat");
+                    if (modelViewMatUniform != null) {
+                        modelViewMatUniform.set(RenderSystem.getModelViewMatrix());
+                        hasNamedUniforms = true;
+                    }
+                } catch (Exception e) {
+                    InterfaceManager.coreInterface.logError("MATRIX DEBUG: Exception getting uniforms by name: " + e.getMessage());
                 }
+
+                // Debug logging - only log once per approach
+                if (!projectionMatrixWarningLogged) {
+                    InterfaceManager.coreInterface.logError("MATRIX DEBUG: Direct fields available: " + hasDirectFields + ", Named uniforms available: " + hasNamedUniforms);
+                    InterfaceManager.coreInterface.logError("MATRIX DEBUG: Shader name: " + (shaderInstance != null ? shaderInstance.getName() : "null"));
+                    projectionMatrixWarningLogged = true;
+                }
+                // INVERSE_VIEW_ROTATION_MATRIX removed in MC 1.21.1 - replaced with uniform blocks
+                // TODO: Implement proper uniform block handling for view rotation matrix
+                // if (shaderInstance.INVERSE_VIEW_ROTATION_MATRIX != null) {
+                //     shaderInstance.INVERSE_VIEW_ROTATION_MATRIX.set(RenderSystem.getInverseViewRotationMatrix());
+                // }
                 if (shaderInstance.COLOR_MODULATOR != null) {
                     shaderInstance.COLOR_MODULATOR.set(RenderSystem.getShaderColor());
                 }
@@ -341,8 +441,25 @@ public class InterfaceRender implements IInterfaceRender {
                 //Now render vertices, setting only the states required each render.
                 for (RenderData data : datas) {
                     if (shaderInstance.MODEL_VIEW_MATRIX != null) {
-                        shaderInstance.MODEL_VIEW_MATRIX.set(data.matrix);
+                        // In MC 1.21.1, we need to combine the entity's world matrix with the camera's view matrix
+                        // to get proper world-to-view space transformation
+                        Matrix4f worldToViewMatrix = new Matrix4f(RenderSystem.getModelViewMatrix());
+                        worldToViewMatrix.mul(data.matrix);
+                        shaderInstance.MODEL_VIEW_MATRIX.set(worldToViewMatrix);
                     }
+
+                    // Also try named uniforms approach for compatibility
+                    try {
+                        var modelViewMatUniform = shaderInstance.getUniform("ModelViewMat");
+                        if (modelViewMatUniform != null) {
+                            Matrix4f worldToViewMatrix = new Matrix4f(RenderSystem.getModelViewMatrix());
+                            worldToViewMatrix.mul(data.matrix);
+                            modelViewMatUniform.set(worldToViewMatrix);
+                        }
+                    } catch (Exception e) {
+                        // Ignore uniform errors for now
+                    }
+
                     shaderInstance.apply();
                     data.bufferData.buffer.bind();
                     data.bufferData.buffer.draw();
@@ -355,9 +472,15 @@ public class InterfaceRender implements IInterfaceRender {
 
             if (!datas.isEmpty()) {
                 renderType.setupRenderState();
+                ShaderInstance shader = RenderSystem.getShader();
+                if (shader == null) {
+                    InterfaceManager.coreInterface.logError("CRITICAL: RenderSystem.getShader() returned null in vertex buffer rendering! Render type: " + renderType);
+                    renderType.clearRenderState();
+                    continue;
+                }
                 for (RenderData data : datas) {
                     data.bufferData.buffer.bind();
-                    data.bufferData.buffer.drawWithShader(data.matrix, projectionMatrix, RenderSystem.getShader());
+                    data.bufferData.buffer.drawWithShader(data.matrix, projectionMatrix, shader);
                 }
                 VertexBuffer.unbind();
                 renderType.clearRenderState();
@@ -462,7 +585,7 @@ public class InterfaceRender implements IInterfaceRender {
             try {
                 NativeImage image = NativeImage.read(NativeImage.Format.RGB, stream);
                 DynamicTexture texture = new DynamicTexture(image);
-                ResourceLocation textureLocation = Minecraft.getInstance().textureManager.register("mts-url", texture);
+                ResourceLocation textureLocation = Minecraft.getInstance().getTextureManager().register("mts-url", texture);
                 onlineTextures.put(textureURL, textureLocation);
                 return true;
             } catch (Exception e) {
@@ -486,7 +609,7 @@ public class InterfaceRender implements IInterfaceRender {
 
                 NativeImage image = NativeImage.read(NativeImage.Format.RGB, frameStream);
                 DynamicTexture texture = new DynamicTexture(image);
-                ResourceLocation textureLocation = Minecraft.getInstance().textureManager.register("mts-gif", texture);
+                ResourceLocation textureLocation = Minecraft.getInstance().getTextureManager().register("mts-gif", texture);
                 gifFrameIndexes.put(frame, textureLocation);
             } catch (Exception e) {
                 return false;
@@ -501,10 +624,9 @@ public class InterfaceRender implements IInterfaceRender {
      * Helper function to create a new texture state for the specified texture location.
      */
     private static RenderStateShard.TextureStateShard getTexture(String textureLocation) {
-        //Check to make sure textures exist.  We delay creating because some mods screw up this stuff in boot.  Cray, looking at you buddy.
-        if (MISSING_STATE == null) {
-            MISSING_STATE = new RenderStateShard.TextureStateShard(new ResourceLocation("mts:textures/rendering/missing.png"), false, false);
-            BLOCK_STATE = new RenderStateShard.TextureStateShard(BLOCK_TEXTURE_LOCATION, false, false);
+        //Ensure texture states are initialized - should be done during mod setup now
+        if (!textureStatesInitialized) {
+            initializeTextureStates();
         }
 
         if (animatedGIFs.containsKey(textureLocation)) {
@@ -530,7 +652,7 @@ public class InterfaceRender implements IInterfaceRender {
                 //Convert the classpath-location to a domain-location path for MC.
                 String domain = formattedLocation.substring("/assets/".length(), formattedLocation.indexOf("/", "/assets/".length()));
                 String location = formattedLocation.substring("/assets/".length() + domain.length() + 1);
-                return new RenderStateShard.TextureStateShard(new ResourceLocation(domain, location), false, false);
+                return new RenderStateShard.TextureStateShard(ResourceLocation.fromNamespaceAndPath(domain, location), false, false);
             } else {
                 InterfaceManager.coreInterface.logError("Could not find texture: " + formattedLocation + " Reverting to fallback texture.");
                 return MISSING_STATE;
@@ -546,7 +668,8 @@ public class InterfaceRender implements IInterfaceRender {
         matrixStack = mcGUI.pose();
         matrixStack.pushPose();
         renderingGUI = true;
-        MultiBufferSource.BufferSource guiBuffer = MultiBufferSource.immediate(Tesselator.getInstance().getBuilder());
+        ByteBufferBuilder byteBufferBuilder = new ByteBufferBuilder(256);
+        MultiBufferSource.BufferSource guiBuffer = MultiBufferSource.immediate(byteBufferBuilder);
         renderBuffer = guiBuffer;
 
         //Render GUIs, re-creating their components if needed.
@@ -560,24 +683,46 @@ public class InterfaceRender implements IInterfaceRender {
                 gui.setupComponentsInit(screenWidth, screenHeight);
             }
             matrixStack.pushPose();
+
+            //CRITICAL: Use NeoForge 1.21.1 GUI z-level system instead of manual depth manipulation
+            //Set GUI to render at maximum GUI depth to ensure it's in front of background blur
+            int guiZLevel;
             if (gui.capturesPlayer()) {
-                //Translate in front of the main GUI components.
-                matrixStack.translate(0, 0, 250);
+                guiZLevel = 500; // High priority for player-capturing GUIs
             } else {
-                //Translate far enough to render behind the chat window.
-                matrixStack.translate(0, 0, -500 + 250 * displayGUIIndex++);
+                guiZLevel = 400 + (100 * displayGUIIndex++); // Stack multiple GUIs properly
             }
+
+            //Use GuiGraphics z-level system - this works with NeoForge 1.21.1 strata
+            matrixStack.translate(0, 0, guiZLevel);
+
+            //Enable proper blending but let NeoForge handle depth
+            RenderSystem.enableBlend();
+            RenderSystem.defaultBlendFunc();
+
+            //Set GUI-specific shader
+            RenderSystem.setShader(GameRenderer::getPositionTexShader);
+
             gui.render(mouseX, mouseY, false, partialTicks);
             guiBuffer.endBatch();
             //Not needed, since we can't draw to custom buffers with GUIs.
             //renderBuffers();
 
-            //Need to use RenderSystem here, since this is a direct buffer.
-            RenderSystem.enableBlend();
+            //Render blended elements with proper transparency
+            RenderSystem.blendFuncSeparate(
+                GlStateManager.SourceFactor.SRC_ALPHA,
+                GlStateManager.DestFactor.ONE_MINUS_SRC_ALPHA,
+                GlStateManager.SourceFactor.ONE,
+                GlStateManager.DestFactor.ONE_MINUS_SRC_ALPHA
+            );
             gui.render(mouseX, mouseY, true, partialTicks);
             guiBuffer.endBatch();
             //renderBuffers();
+
+            //Restore render state properly
             RenderSystem.disableBlend();
+            RenderSystem.enableDepthTest();
+            RenderSystem.depthMask(true);
         
             //Render all stacks.  These have to be in the standard GUI reference frame or they won't render.
             matrixStack.scale(1.0F, -1.0F, 1.0F);
@@ -587,7 +732,9 @@ public class InterfaceRender implements IInterfaceRender {
                 if ((WrapperItemStack) component.stackToRender != null) {
                     //Apply existing transform.
                     //Need to use RenderSystem here, since we can't access the stack directly for rendering scaling.
-                    PoseStack posestack = RenderSystem.getModelViewStack();
+                    // RenderSystem.getModelViewStack() returns Matrix4fStack in older versions but PoseStack in 1.21.1
+                    // Creating a new PoseStack for transform operations
+                    PoseStack posestack = new PoseStack();
                     posestack.pushPose();
                     //Need to translate the z-offset to our value, which includes a -100 for the default added value.
                     posestack.translate(0, 0, (float) (component.translation.z - 100));
@@ -664,7 +811,7 @@ public class InterfaceRender implements IInterfaceRender {
             //Convert verts to faces, then back to quad-verts for MC rendering.
             //Add one face extra, since MC will want to increase the buffer if sees it can't handle another vert.
             vertices = ((vertices / 3) + 1) * 3;
-            this.builder = new BufferBuilder(type.format().getIntegerSize() * vertices);
+            this.builder = new BufferBuilder(new ByteBufferBuilder(type.format().getVertexSize() * vertices), VertexFormat.Mode.TRIANGLES, type.format());
             this.buffer = new VertexBuffer(VertexBuffer.Usage.STATIC);
         }
     }

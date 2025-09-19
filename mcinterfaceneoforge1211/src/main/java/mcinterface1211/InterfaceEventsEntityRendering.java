@@ -18,13 +18,13 @@ import minecrafttransportsimulator.systems.ConfigSystem;
 import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
 import net.minecraft.world.entity.player.Player;
-import net.neoforged.neoforge.api.distmarker.Dist;
+import net.neoforged.api.distmarker.Dist;
 import net.neoforged.neoforge.client.event.CustomizeGuiOverlayEvent;
 import net.neoforged.neoforge.client.event.RenderArmEvent;
-import net.neoforged.neoforge.client.event.RenderGuiOverlayEvent;
+import net.neoforged.neoforge.client.event.RenderGuiLayerEvent;
 import net.neoforged.neoforge.client.event.RenderHandEvent;
 import net.neoforged.neoforge.client.event.ViewportEvent.ComputeCameraAngles;
-import net.neoforged.neoforge.client.gui.overlay.VanillaGuiOverlay;
+import net.neoforged.neoforge.client.gui.VanillaGuiLayers;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 
@@ -47,7 +47,7 @@ public class InterfaceEventsEntityRendering {
     /**
      * Changes camera rotation to match custom rotation, and also gets custom position for custom cameras.
      */
-    @EventHandler
+    @SubscribeEvent
     public static void onIVCameraSetup(ComputeCameraAngles event) {
         Camera camera = event.getCamera();
         if (camera.getEntity() instanceof Player) {
@@ -84,16 +84,16 @@ public class InterfaceEventsEntityRendering {
     /**
      * Blocks all overlays that we don't want to render.
      */
-    @EventHandler
-    public static void onIVPreLayer(RenderGuiOverlayEvent.Pre event) {
+    @SubscribeEvent
+    public static void onIVPreLayer(RenderGuiLayerEvent.Pre event) {
         //If we are rendering the custom camera overlay, block the crosshairs and the hotbar.
-        if ((event.getOverlay() == VanillaGuiOverlay.CROSSHAIR.type() || event.getOverlay() == VanillaGuiOverlay.HOTBAR.type()) && CameraSystem.customCameraOverlay != null) {
+        if ((event.getName().equals(VanillaGuiLayers.CROSSHAIR) || event.getName().equals(VanillaGuiLayers.HOTBAR)) && CameraSystem.customCameraOverlay != null) {
             event.setCanceled(true);
             return;
         }
 
         //If we are seated in a controller seat, and are rendering GUIs, disable the hotbar.
-        if ((event.getOverlay() == VanillaGuiOverlay.HOTBAR.type() || event.getOverlay() == VanillaGuiOverlay.FOOD_LEVEL.type() || event.getOverlay() == VanillaGuiOverlay.PLAYER_HEALTH.type() || event.getOverlay() == VanillaGuiOverlay.ARMOR_LEVEL.type() || event.getOverlay() == VanillaGuiOverlay.EXPERIENCE_BAR.type()) && (InterfaceManager.clientInterface.getCameraMode() == CameraMode.FIRST_PERSON ? ConfigSystem.client.renderingSettings.renderHUD_1P.value : ConfigSystem.client.renderingSettings.renderHUD_3P.value)) {
+        if ((event.getName().equals(VanillaGuiLayers.HOTBAR) || event.getName().equals(VanillaGuiLayers.FOOD_LEVEL) || event.getName().equals(VanillaGuiLayers.PLAYER_HEALTH) || event.getName().equals(VanillaGuiLayers.ARMOR_LEVEL) || event.getName().equals(VanillaGuiLayers.EXPERIENCE_BAR)) && (InterfaceManager.clientInterface.getCameraMode() == CameraMode.FIRST_PERSON ? ConfigSystem.client.renderingSettings.renderHUD_1P.value : ConfigSystem.client.renderingSettings.renderHUD_3P.value)) {
             IWrapperPlayer player = InterfaceManager.clientInterface.getClientPlayer();
             AEntityB_Existing ridingEntity = player.getEntityRiding();
             if (ridingEntity instanceof PartSeat && ((PartSeat) ridingEntity).placementDefinition.isController) {
@@ -107,7 +107,7 @@ public class InterfaceEventsEntityRendering {
      * Renders all overlay things.  This is essentially anything that's a 2D render, such as the main overlay,
      * vehicle HUds, GUIs, camera overlays, etc.
      */
-    @EventHandler
+    @SubscribeEvent
     public static void onIVRenderOverlayChat(CustomizeGuiOverlayEvent.Chat event) {
         //Do overlay rendering before the chat window is rendered.
         //This renders them over the main hotbar, but doesn't block the chat window.
@@ -121,7 +121,7 @@ public class InterfaceEventsEntityRendering {
         int mouseX = (int) (xPos[0] * screenWidth / window.getScreenWidth());
         int mouseY = (int) (yPos[0] * screenHeight / window.getScreenHeight());
 
-        float partialTicks = event.getPartialTick();
+        float partialTicks = event.getPartialTick().getGameTimeDeltaPartialTick(false);
         boolean updateGUIs = screenWidth != lastScreenWidth || screenHeight != lastScreenHeight;
         if (updateGUIs) {
             lastScreenWidth = screenWidth;
@@ -135,7 +135,7 @@ public class InterfaceEventsEntityRendering {
      * Hand and arm render events.  We use these to disable rendering of the item in the player's hand
      * if they are holding a gun.  Not sure why there's two events, but we cancel them both!
      */
-    @EventHandler
+    @SubscribeEvent
     public static void onIVRenderHand(RenderHandEvent event) {
         EntityPlayerGun entity = EntityPlayerGun.playerClientGuns.get(Minecraft.getInstance().player.getUUID());
         if ((entity != null && entity.activeGun != null) || CameraSystem.activeCamera != null) {
@@ -143,7 +143,7 @@ public class InterfaceEventsEntityRendering {
         }
     }
 
-    @EventHandler
+    @SubscribeEvent
     public static void onIVRenderArm(RenderArmEvent event) {
         EntityPlayerGun entity = EntityPlayerGun.playerClientGuns.get(Minecraft.getInstance().player.getUUID());
         if ((entity != null && entity.activeGun != null) || CameraSystem.activeCamera != null) {

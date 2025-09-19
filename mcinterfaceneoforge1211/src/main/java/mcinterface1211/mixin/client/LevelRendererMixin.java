@@ -50,6 +50,8 @@ public abstract class LevelRendererMixin {
         InterfaceRender.renderCameraOffset.set(position.x, position.y, position.z);
         InterfaceRender.matrixStack = pMatrixStack;
         InterfaceRender.renderBuffer = irendertypebuffer$impl;
+        // Ensure projection matrix is set right before rendering
+        InterfaceRender.projectionMatrix = pProjection;
         if (ConfigSystem.settings.general.forceRenderLastSolid.value) {
             InterfaceRender.doRenderCall(false, pPartialTicks);
         }

@@ -22,6 +22,7 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.context.BlockPlaceContext;
 import net.minecraft.world.level.BlockGetter;
+import net.minecraft.world.level.LevelReader;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.LevelAccessor;
 import net.minecraft.world.level.block.Block;
@@ -115,7 +116,7 @@ public class BuilderBlockTileEntity extends BuilderBlock implements EntityBlock 
 
     @SuppressWarnings("deprecation")
     @Override
-    public InteractionResult use(BlockState state, Level world, BlockPos pos, Player player, InteractionHand hand, BlockHitResult hit) {
+    public InteractionResult useWithoutItem(BlockState state, Level world, BlockPos pos, Player player, BlockHitResult hit) {
         //Forward this click to the block.  For left-clicks we'll need to use item attack calls.
         if (!world.isClientSide()) {
             BlockEntity tile = world.getBlockEntity(pos);
@@ -127,7 +128,7 @@ public class BuilderBlockTileEntity extends BuilderBlock implements EntityBlock 
         } else {
             return InteractionResult.CONSUME;
         }
-        return super.use(state, world, pos, player, hand, hit);
+        return super.useWithoutItem(state, world, pos, player, hit);
     }
 
     @Override
@@ -147,7 +148,7 @@ public class BuilderBlockTileEntity extends BuilderBlock implements EntityBlock 
 
     @SuppressWarnings("deprecation")
     @Override
-    public ItemStack getCloneItemStack(BlockGetter world, BlockPos pos, BlockState state) {
+    public ItemStack getCloneItemStack(LevelReader world, BlockPos pos, BlockState state) {
         //Returns the ItemStack that gets put in the player's inventory when they middle-click this block.
         //This calls down into getItem, which then uses the Item class's block<->item mapping to get a block.
         //By overriding here, we intercept those calls and return our own.  This also allows us to put NBT

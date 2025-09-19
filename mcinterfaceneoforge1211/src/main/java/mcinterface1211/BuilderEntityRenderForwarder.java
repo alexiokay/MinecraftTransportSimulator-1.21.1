@@ -6,8 +6,7 @@ import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec3;
-import net.neoforged.fml.common.EventBusSubscriber;
-import net.neoforged.neoforge.registries.RegistryObject;
+import java.util.function.Supplier;
 
 /**
  * Builder for an entity to forward rendering calls to all internal renderer.  This is due to prevent
@@ -16,9 +15,8 @@ import net.neoforged.neoforge.registries.RegistryObject;
  *
  * @author don_bruce
  */
-@EventBusSubscriber
 public class BuilderEntityRenderForwarder extends ABuilderEntityBase {
-    public static RegistryObject<EntityType<BuilderEntityRenderForwarder>> E_TYPE4;
+    public static Supplier<EntityType<BuilderEntityRenderForwarder>> E_TYPE4;
 
     protected Player playerFollowing;
 

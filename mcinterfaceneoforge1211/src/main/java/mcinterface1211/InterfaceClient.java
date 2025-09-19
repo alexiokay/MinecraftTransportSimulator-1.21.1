@@ -1,5 +1,7 @@
 package mcinterface1211;
 import net.minecraft.core.registries.Registries;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.world.item.Item;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -37,9 +39,9 @@ import net.minecraft.world.item.TooltipFlag;
 import net.minecraft.world.level.block.SoundType;
 import net.minecraft.world.level.material.Fluid;
 import net.minecraft.world.phys.Vec3;
-import net.neoforged.neoforge.api.distmarker.Dist;
-import net.neoforged.neoforge.event.TickEvent;
-import net.neoforged.neoforge.event.TickEvent.Phase;
+import net.neoforged.api.distmarker.Dist;
+// Updated for NeoForge 1.21.1: New tick event system with Pre/Post events
+import net.neoforged.neoforge.client.event.ClientTickEvent;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.fluids.FluidStack;
 import net.neoforged.fml.common.EventBusSubscriber;
@@ -73,7 +75,7 @@ public class InterfaceClient implements IInterfaceClient {
 
     @Override
     public String getFluidName(String fluidID, String fluidMod) {
-        for (Entry<ResourceKey<Fluid>, Fluid> fluidEntry : NeoForgeRegistries.FLUIDS.getEntries()) {
+        for (Entry<ResourceKey<Fluid>, Fluid> fluidEntry : BuiltInRegistries.FLUID.entrySet()) {
             ResourceLocation fluidLocation = fluidEntry.getKey().location();
             if ((fluidMod.equals(EntityFluidTank.WILDCARD_FLUID_MOD) || fluidLocation.getNamespace().equals(fluidMod)) && fluidLocation.getPath().equals(fluidID)) {
                 return fluidEntry.getValue().getFluidType().getDescription().getString();
@@ -85,8 +87,8 @@ public class InterfaceClient implements IInterfaceClient {
     @Override
     public Map<String, String> getAllFluidNames() {
         Map<String, String> fluidIDsToNames = new HashMap<>();
-        for (Fluid fluid : NeoForgeRegistries.FLUIDS.getValues()) {
-            fluidIDsToNames.put(NeoForgeRegistries.FLUIDS.getKey(fluid).getPath(), new FluidStack(fluid, 1).getDisplayName().getString());
+        for (Fluid fluid : BuiltInRegistries.FLUID) {
+            fluidIDsToNames.put(BuiltInRegistries.FLUID.getKey(fluid).getPath(), new FluidStack(fluid, 1).getHoverName().getString());
         }
         return fluidIDsToNames;
     }
@@ -187,7 +189,7 @@ public class InterfaceClient implements IInterfaceClient {
     @Override
     public List<String> getTooltipLines(IWrapperItemStack stack) {
         List<String> tooltipText = new ArrayList<>();
-        List<Component> tooltipLines = ((WrapperItemStack) stack).stack.getTooltipLines(Minecraft.getInstance().player, Minecraft.getInstance().options.advancedItemTooltips ? TooltipFlag.Default.ADVANCED : TooltipFlag.Default.NORMAL);
+        List<Component> tooltipLines = ((WrapperItemStack) stack).stack.getTooltipLines(Item.TooltipContext.of(Minecraft.getInstance().level), Minecraft.getInstance().player, Minecraft.getInstance().options.advancedItemTooltips ? TooltipFlag.Default.ADVANCED : TooltipFlag.Default.NORMAL);
         //Add grey formatting text to non-first line tooltips.
         for (int i = 0; i < tooltipLines.size(); ++i) {
             Component component = tooltipLines.get(i);
@@ -232,74 +234,83 @@ public class InterfaceClient implements IInterfaceClient {
      * These don't get ticked normally due to the world tick event
      * not being called on clients.
      */
-    @EventHandler
-    public static void onIVClientTick(TickEvent.ClientTickEvent event) {
+    // Updated for NeoForge 1.21.1: Using ClientTickEvent.Pre instead of TickEvent.ClientTickEvent with Phase.START
+    @SubscribeEvent
+    public static void onIVClientTickPre(ClientTickEvent.Pre event) {
         IWrapperPlayer player = InterfaceManager.clientInterface.getClientPlayer();
         if (!InterfaceManager.clientInterface.isGamePaused() && player != null) {
             AWrapperWorld world = InterfaceManager.clientInterface.getClientWorld();
             if (world != null) {
-                if (event.phase.equals(Phase.START)) {
-                    if (!player.isSpectator()) {
-                        //Handle controls.  This has to happen prior to vehicle updates to ensure click handling is based on current position of the player.
-                        ControlSystem.controlGlobal(player);
-                        if (((WrapperPlayer) player).player.tickCount % 100 == 0) {
-                            if (!InterfaceManager.clientInterface.isGUIOpen() && !PackParser.arePacksPresent()) {
-                                new GUIPackMissing();
-                            }
+                if (!player.isSpectator()) {
+                    //Handle controls.  This has to happen prior to vehicle updates to ensure click handling is based on current position of the player.
+                    ControlSystem.controlGlobal(player);
+                    if (((WrapperPlayer) player).player.tickCount % 100 == 0) {
+                        if (!InterfaceManager.clientInterface.isGUIOpen() && !PackParser.arePacksPresent()) {
+                            new GUIPackMissing();
                         }
                     }
+                }
 
-                    //Need to update world brightness since sky darken isn't calculated normally on clients.
-                    ((WrapperWorld) world).world.updateSkyBrightness();
+                //Need to update world brightness since sky darken isn't calculated normally on clients.
+                ((WrapperWorld) world).world.updateSkyBrightness();
 
-                    world.tickAll(true);
-                    
-                    //Complain about Entity Culling mod at 10 second mark.
-                    if(ConfigSystem.settings.general.performModCompatFunctions.value && InterfaceManager.coreInterface.isModPresent("entityculling")) {
-                    	if(ticksToCullingWarning > 0) {
-                    		if(--ticksToCullingWarning == 0) {
-                    			player.displayChatMessage(LanguageSystem.SYSTEM_DEBUG, "IV HAS DETECTED THAT ENTITY CULLING MOD IS PRESENT.  THIS MOD CULLS ALL IV VEHICLES UNLESS \"mts:builder_existing\", \"mts:builder_rendering\", AND \"mts:builder_seat\" ARE ADDED TO THE WHITELIST.");
-                    		}
-                    	}
-                    }
-                } else {
-                    world.tickAll(false);
-                    
-                    //Handle camera requests.
-                    if(cameraModeRequest != null) {
-                    	switch(cameraModeRequest) {
-	                    	case FIRST_PERSON:{
-                                Minecraft.getInstance().options.setCameraType(CameraType.FIRST_PERSON);
-	                    		break;
-	                    	}
-	                    	case THIRD_PERSON:{
-                                Minecraft.getInstance().options.setCameraType(CameraType.THIRD_PERSON_BACK);
-	                    		break;
-	                    	}
-	                    	case THIRD_PERSON_INVERTED:{
-                                Minecraft.getInstance().options.setCameraType(CameraType.THIRD_PERSON_FRONT);
-	                    		break;
-	                    	}
-                    	}
-                    	cameraModeRequest = null;
-                    }
+                world.tickAll(true);
 
-                    //Update camera state, since this can change depending on tick if we check during renders.
-                    CameraType cameraModeEnum = Minecraft.getInstance().options.getCameraType();
-                    switch(cameraModeEnum) {
-                    	case FIRST_PERSON:{
-                    		actualCameraMode = CameraMode.FIRST_PERSON;
-                    		break;
-                    	}
-                    	case THIRD_PERSON_BACK:{
-                    		actualCameraMode = CameraMode.THIRD_PERSON;
-                    		break;
-                    	}
-                    	case THIRD_PERSON_FRONT:{
-                    		actualCameraMode = CameraMode.THIRD_PERSON_INVERTED;
-                    		break;
-                    	}
-                    }
+                //Complain about Entity Culling mod at 10 second mark.
+                if(ConfigSystem.settings.general.performModCompatFunctions.value && InterfaceManager.coreInterface.isModPresent("entityculling")) {
+                	if(ticksToCullingWarning > 0) {
+                		if(--ticksToCullingWarning == 0) {
+                			player.displayChatMessage(LanguageSystem.SYSTEM_DEBUG, "IV HAS DETECTED THAT ENTITY CULLING MOD IS PRESENT.  THIS MOD CULLS ALL IV VEHICLES UNLESS \"mts:builder_existing\", \"mts:builder_rendering\", AND \"mts:builder_seat\" ARE ADDED TO THE WHITELIST.");
+                		}
+                	}
+                }
+            }
+        }
+    }
+
+    // Updated for NeoForge 1.21.1: Using ClientTickEvent.Post for Phase.END behavior
+    @SubscribeEvent
+    public static void onIVClientTickPost(ClientTickEvent.Post event) {
+        IWrapperPlayer player = InterfaceManager.clientInterface.getClientPlayer();
+        if (!InterfaceManager.clientInterface.isGamePaused() && player != null) {
+            AWrapperWorld world = InterfaceManager.clientInterface.getClientWorld();
+            if (world != null) {
+                world.tickAll(false);
+
+                //Handle camera requests.
+                if(cameraModeRequest != null) {
+                	switch(cameraModeRequest) {
+	                	case FIRST_PERSON:{
+                            Minecraft.getInstance().options.setCameraType(CameraType.FIRST_PERSON);
+	                		break;
+	                	}
+	                	case THIRD_PERSON:{
+                            Minecraft.getInstance().options.setCameraType(CameraType.THIRD_PERSON_BACK);
+	                		break;
+	                	}
+	                	case THIRD_PERSON_INVERTED:{
+                            Minecraft.getInstance().options.setCameraType(CameraType.THIRD_PERSON_FRONT);
+	                		break;
+	                	}
+                	}
+                	cameraModeRequest = null;
+                }
+
+                //Update camera state, since this can change depending on tick if we check during renders.
+                CameraType cameraModeEnum = Minecraft.getInstance().options.getCameraType();
+                switch(cameraModeEnum) {
+                	case FIRST_PERSON:{
+                		actualCameraMode = CameraMode.FIRST_PERSON;
+                		break;
+                	}
+                	case THIRD_PERSON_BACK:{
+                		actualCameraMode = CameraMode.THIRD_PERSON;
+                		break;
+                	}
+                	case THIRD_PERSON_FRONT:{
+                		actualCameraMode = CameraMode.THIRD_PERSON_INVERTED;
+                		break;
+                	}
                 }
             }
         }

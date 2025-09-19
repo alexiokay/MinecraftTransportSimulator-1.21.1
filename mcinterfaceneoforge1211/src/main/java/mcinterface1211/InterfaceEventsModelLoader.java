@@ -94,10 +94,15 @@ public class InterfaceEventsModelLoader {
         public IoSupplier<InputStream> getRootResource(String... pElements) {
             String pFileName = String.join("/", pElements);
             if (!pFileName.contains("/") && !pFileName.contains("\\")) {
-                return this.getResource(PackType.CLIENT_RESOURCES, new ResourceLocation(pFileName));
+                return this.getResource(PackType.CLIENT_RESOURCES, ResourceLocation.withDefaultNamespace(pFileName));
             } else {
                 throw new IllegalArgumentException("Root resources can only be filenames, not paths (no / allowed!)");
             }
+        }
+
+        @Override
+        public net.minecraft.server.packs.PackLocationInfo location() {
+            return new net.minecraft.server.packs.PackLocationInfo("mts_generated", net.minecraft.network.chat.Component.literal("MTS Generated Resources"), net.minecraft.server.packs.repository.PackSource.DEFAULT, java.util.Optional.empty());
         }
 
         @Override

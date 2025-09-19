@@ -32,6 +32,7 @@ import minecrafttransportsimulator.packloading.PackParser;
 import minecrafttransportsimulator.systems.ConfigSystem;
 import minecrafttransportsimulator.systems.LanguageSystem;
 import net.minecraft.core.registries.Registries;
+import net.minecraft.core.Direction;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.MobCategory;
@@ -45,10 +46,15 @@ import net.neoforged.fml.ModList;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.event.lifecycle.FMLConstructModEvent;
 import net.neoforged.fml.event.lifecycle.FMLLoadCompleteEvent;
-import net.neoforged.fml.javafmlmod.FMLJavaModLoadingContext;
+import net.neoforged.bus.api.IEventBus;
+import net.neoforged.fml.ModLoadingContext;
 import net.neoforged.fml.loading.FMLEnvironment;
 import net.neoforged.fml.loading.FMLPaths;
 import net.neoforged.neoforge.registries.DeferredRegister;
+import net.neoforged.neoforge.capabilities.RegisterCapabilitiesEvent;
+import net.neoforged.neoforge.capabilities.Capabilities;
+import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
+import net.neoforged.bus.api.SubscribeEvent;
 
 /**
  * Loader interface for the mod.  This class is not actually an interface, unlike everything else.
@@ -64,7 +70,7 @@ public class InterfaceLoader {
     public static final String MODNAME = "Immersive Vehicles (MTS)";
     public static final String MODVER = "22.18.0";
 
-    private final FMLJavaModLoadingContext context;
+    private final IEventBus modEventBus;
     public static final Logger LOGGER = LogManager.getLogger(InterfaceLoader.MODID);
     private final String gameDirectory;
     public static Set<String> packIDs = new HashSet<>();
@@ -76,10 +82,12 @@ public class InterfaceLoader {
     protected static final DeferredRegister<CreativeModeTab> CREATIVE_TABS = DeferredRegister.create(Registries.CREATIVE_MODE_TAB, InterfaceLoader.MODID);
 
     public InterfaceLoader() {
-        this.context = FMLJavaModLoadingContext.get();
+        this.modEventBus = ModLoadingContext.get().getActiveContainer().getEventBus();
         this.gameDirectory = FMLPaths.GAMEDIR.get().toFile().getAbsolutePath();
-        context.getModEventBus().addListener(this::init);
-        context.getModEventBus().addListener(this::onPostConstruction);
+        modEventBus.addListener(this::init);
+        modEventBus.addListener(this::onPostConstruction);
+        modEventBus.addListener(this::onRegisterCapabilities);
+        modEventBus.addListener(this::onRegisterPayloadHandlers);
     }
 
     /**Need to defer init until post-mod construction, as in this version
@@ -90,11 +98,11 @@ public class InterfaceLoader {
      */
     public void init(FMLConstructModEvent event) {
         //Add registries.
-        BuilderItem.ITEMS.register(context.getModEventBus());
-        BuilderBlock.BLOCKS.register(context.getModEventBus());
-        BuilderTileEntity.TILE_ENTITIES.register(context.getModEventBus());
-        ABuilderEntityBase.ENTITIES.register(context.getModEventBus());
-        CREATIVE_TABS.register(context.getModEventBus());
+        BuilderItem.ITEMS.register(modEventBus);
+        BuilderBlock.BLOCKS.register(modEventBus);
+        BuilderTileEntity.TILE_ENTITIES.register(modEventBus);
+        ABuilderEntityBase.ENTITIES.register(modEventBus);
+        CREATIVE_TABS.register(modEventBus);
 
         //Need to do pack parsing first, since that generates items which have to be registered prior to any other events.
         boolean isClient = FMLEnvironment.dist.isClient();
@@ -102,9 +110,12 @@ public class InterfaceLoader {
         //Init interfaces and send to the main game system.
         if (isClient) {
             new InterfaceManager(MODID, gameDirectory, new InterfaceCore(), new InterfacePacket(), new InterfaceClient(), new InterfaceInput(), new InterfaceSound(), new InterfaceRender());
-            context.getModEventBus().addListener(InterfaceInput::onIVRegisterKeyMappingsEvent);
-            context.getModEventBus().addListener(InterfaceRender::onIVRegisterShadersEvent);
-            context.getModEventBus().addListener(InterfaceRender::onIVRegisterRenderersEvent);
+            modEventBus.addListener(InterfaceInput::onIVRegisterKeyMappingsEvent);
+            modEventBus.addListener(InterfaceRender::onIVRegisterShadersEvent);
+            modEventBus.addListener(InterfaceRender::onIVRegisterRenderersEvent);
+
+            //Initialize texture states early to prevent render delays
+            InterfaceRender.initializeTextureStates();
         } else {
             new InterfaceManager(MODID, gameDirectory, new InterfaceCore(), new InterfacePacket(), null, null, null, null);
         }
@@ -152,7 +163,7 @@ public class InterfaceLoader {
                         itemProperties.stacksTo(item.getStackSize());
                         if (item instanceof ItemItem && ((ItemItem) item).definition.food != null) {
                             IItemFood food = (IItemFood) item;
-                            itemProperties.food(new FoodProperties.Builder().nutrition(food.getHungerAmount()).saturationMod(food.getSaturationAmount()).build());
+                            itemProperties.food(new FoodProperties.Builder().nutrition(food.getHungerAmount()).saturationModifier(food.getSaturationAmount()).build());
                         }
                         return new BuilderItem(itemProperties, item);
                     });
@@ -245,14 +256,21 @@ public class InterfaceLoader {
 
         //Iterate over all pack items and find those that spawn entities.
         //Register these with the IV internal system.
+        InterfaceManager.coreInterface.logError("ENTITY DEBUG: Starting entity factory registration process");
+        int entityProviderCount = 0;
         for (AItemPack<?> packItem : PackParser.getAllPackItems()) {
             if (packItem instanceof IItemEntityProvider) {
+                entityProviderCount++;
+                InterfaceManager.coreInterface.logError("ENTITY DEBUG: Registering entity provider: " + packItem.getRegistrationName());
                 ((IItemEntityProvider) packItem).registerEntities(BuilderEntityExisting.entityMap);
             }
         }
+        InterfaceManager.coreInterface.logError("ENTITY DEBUG: Registered " + entityProviderCount + " entity providers, total entityMap size: " + BuilderEntityExisting.entityMap.size());
+        for (String entityId : BuilderEntityExisting.entityMap.keySet()) {
+            InterfaceManager.coreInterface.logError("ENTITY DEBUG: Registered entity ID: " + entityId);
+        }
 
-        //Init networking interface.  This will register packets as well.
-        InterfacePacket.init();
+        //Networking interface will be initialized via RegisterPayloadHandlersEvent handler
 
         if (isClient) {
             //Init keybinds if we're on the client.
@@ -271,5 +289,48 @@ public class InterfaceLoader {
             //Save modified config.
             ConfigSystem.saveToDisk();
         }
+    }
+
+    /**
+     * Register capabilities for tile entities.
+     */
+    @SubscribeEvent
+    public void onRegisterCapabilities(RegisterCapabilitiesEvent event) {
+        // Register ItemHandler capability for inventory tile entities (they implement IItemHandler directly)
+        event.registerBlockEntity(Capabilities.ItemHandler.BLOCK, BuilderTileEntityInventoryContainer.TE_TYPE2.get(), (blockEntity, side) -> {
+            // Only allow access from up and down directions, matching old capability behavior
+            if (side == Direction.UP || side == Direction.DOWN) {
+                return (BuilderTileEntityInventoryContainer) blockEntity;
+            }
+            return null;
+        });
+
+        // Register FluidHandler capability for fluid tank tile entities (they implement IFluidHandler directly)
+        event.registerBlockEntity(Capabilities.FluidHandler.BLOCK, BuilderTileEntityFluidTank.TE_TYPE2.get(), (blockEntity, side) -> {
+            // Allow access from all sides
+            return (BuilderTileEntityFluidTank) blockEntity;
+        });
+
+        // Register EnergyStorage capability for energy charger tile entities
+        event.registerBlockEntity(Capabilities.EnergyStorage.BLOCK, BuilderTileEntityEnergyCharger.TE_TYPE2.get(), (blockEntity, side) -> {
+            // Allow access from all sides except null, matching old capability behavior
+            if (side != null) {
+                return (BuilderTileEntityEnergyCharger) blockEntity;
+            }
+            return null;
+        });
+    }
+
+    /**
+     * Register network payload handlers for packet communication.
+     */
+    @SubscribeEvent
+    public void onRegisterPayloadHandlers(RegisterPayloadHandlersEvent event) {
+        // Initialize the networking interface with the payload registrar
+        // Use proper mod version instead of "1" to avoid conflicts
+        // Log event details to understand why it's called multiple times
+        InterfaceManager.coreInterface.logError("PAYLOAD EVENT: RegisterPayloadHandlersEvent triggered for version: 22.18.0");
+        InterfaceManager.coreInterface.logError("PAYLOAD EVENT: Event source: " + event.getClass().getSimpleName());
+        InterfacePacket.init(event.registrar("22.18.0"));
     }
 }

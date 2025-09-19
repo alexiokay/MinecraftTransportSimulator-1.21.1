@@ -36,17 +36,16 @@ dependencies {
     //Netty for networking.
     compileOnly("io.netty:netty-all:4.1.9.Final")
 
-
-    //Set sound code bits as embeds so they are included into the jar.  These don't come with MC.
-    embed("com.googlecode.soundlibs:jlayer:1.0.1.4")
-    embed("org.jcraft:jorbis:0.0.17")
+    //Sound libraries are now handled by the interface layer to avoid module conflicts
+    compileOnly("com.googlecode.soundlibs:jlayer:1.0.1.4")
+    compileOnly("org.jcraft:jorbis:0.0.17")
 }
 
 //Here is where we zip up all embeds and add them to our jar.
+//For NeoForge 1.21.1, we exclude the sound libraries to prevent module conflicts
 jar {
-    from {
-        configurations.embed.collect { it.isDirectory() ? it : zipTree(it) }
-    }
+    // Don't embed sound libraries - they cause module conflicts in NeoForge 1.21.1
+    // The interface layer will handle these dependencies
 }
 
 tasks.withType(JavaCompile).configureEach {

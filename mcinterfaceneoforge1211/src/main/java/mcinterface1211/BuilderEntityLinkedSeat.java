@@ -9,8 +9,9 @@ import minecrafttransportsimulator.mcinterface.InterfaceManager;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
+import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.world.level.Level;
-import net.neoforged.neoforge.registries.RegistryObject;
+import java.util.function.Supplier;
 
 /**
  * Builder for an entity to sit in so they can ride another entity.  We use this rather
@@ -21,7 +22,7 @@ import net.neoforged.neoforge.registries.RegistryObject;
  * @author don_bruce
  */
 public class BuilderEntityLinkedSeat extends ABuilderEntityBase {
-    public static RegistryObject<EntityType<BuilderEntityLinkedSeat>> E_TYPE3;
+    public static Supplier<EntityType<BuilderEntityLinkedSeat>> E_TYPE3;
 
     /**
      * UUID of entity we are a seat on.  This MAY be null if we haven't loaded NBT from the server yet.
@@ -44,6 +45,11 @@ public class BuilderEntityLinkedSeat extends ABuilderEntityBase {
 
     public BuilderEntityLinkedSeat(EntityType<? extends BuilderEntityLinkedSeat> eType, Level world) {
         super(BuilderEntityLinkedSeat.E_TYPE3.get(), world);
+    }
+
+    @Override
+    protected void defineSynchedData(SynchedEntityData.Builder builder) {
+        super.defineSynchedData(builder);
     }
 
     @Override

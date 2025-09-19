@@ -1,5 +1,6 @@
 package mcinterface1211;
 import net.minecraft.core.registries.Registries;
+import net.minecraft.core.registries.BuiltInRegistries;
 
 import javax.annotation.Nonnull;
 
@@ -13,21 +14,20 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockState;
-import net.neoforged.neoforge.common.capabilities.Capability;
-import net.neoforged.neoforge.common.capabilities.ForgeCapabilities;
-import net.neoforged.neoforge.common.util.LazyOptional;
+import net.neoforged.neoforge.capabilities.Capabilities;
 import net.neoforged.neoforge.fluids.FluidStack;
-import net.neoforged.neoforge.fluids.IFluidTank;
 import net.neoforged.neoforge.fluids.capability.IFluidHandler;
-import net.neoforged.neoforge.registries.RegistryObject;
+import net.neoforged.neoforge.fluids.capability.IFluidHandler.FluidAction;
+import net.neoforged.neoforge.registries.NeoForgeRegistries;
+import java.util.function.Supplier;
 
 /**
  * Builder for tile entities that contain fluids.  This builder ticks.
  *
  * @author don_bruce
  */
-public class BuilderTileEntityFluidTank extends BuilderTileEntity implements IFluidTank, IFluidHandler {
-    protected static RegistryObject<BlockEntityType<BuilderTileEntityFluidTank>> TE_TYPE2;
+public class BuilderTileEntityFluidTank extends BuilderTileEntity implements IFluidHandler {
+    protected static Supplier<BlockEntityType<BuilderTileEntityFluidTank>> TE_TYPE2;
 
     private EntityFluidTank tank;
 
@@ -51,12 +51,12 @@ public class BuilderTileEntityFluidTank extends BuilderTileEntity implements IFl
                     //Pump out fluid to handler below, if we have one.
                     BlockEntity teBelow = level.getBlockEntity(getBlockPos().below());
                     if (teBelow != null) {
-                        IFluidHandler fluidHandler = teBelow.getCapability(ForgeCapabilities.FLUID_HANDLER, Direction.UP).orElse(null);
+                        IFluidHandler fluidHandler = level.getCapability(Capabilities.FluidHandler.BLOCK, getBlockPos().below(), Direction.UP);
                         if (fluidHandler != null) {
                             int amountDrained = fluidHandler.fill(getFluid(), FluidAction.EXECUTE);
                             if (amountDrained > 0 && currentFluidAmount == getFluidAmount()) {
                                 //Need to drain from our tank as the system didn't do this.
-                                drain(amountDrained, FluidAction.EXECUTE);
+                                tank.drain(amountDrained, true);
                             }
                         }
                     }
@@ -65,30 +65,26 @@ public class BuilderTileEntityFluidTank extends BuilderTileEntity implements IFl
         }
     }
 
-    @Override
     public FluidStack getFluid() {
         if (tank != null && !tank.getFluid().isEmpty()) {
             //Need to find the mod that registered this fluid, Forge is stupid and has them per-mod vs just all with a single name.
-            for (ResourceLocation fluidKey : NeoForgeRegistries.FLUIDS.getKeys()) {
+            for (ResourceLocation fluidKey : BuiltInRegistries.FLUID.keySet()) {
                 if (fluidKey.getPath().equals(tank.getFluid())) {
-                    return new FluidStack(NeoForgeRegistries.FLUIDS.getValue(fluidKey), (int) tank.getFluidLevel());
+                    return new FluidStack(BuiltInRegistries.FLUID.get(fluidKey), (int) tank.getFluidLevel());
                 }
             }
         }
         return FluidStack.EMPTY;
     }
 
-    @Override
     public int getFluidAmount() {
         return (int) (tank != null ? tank.getFluidLevel() : 0);
     }
 
-    @Override
     public int getCapacity() {
         return tank != null ? tank.getMaxLevel() : 0;
     }
 
-    @Override
     public boolean isFluidValid(FluidStack fluid) {
         return true;
     }
@@ -116,7 +112,7 @@ public class BuilderTileEntityFluidTank extends BuilderTileEntity implements IFl
     @Override
     public int fill(FluidStack stack, FluidAction doFill) {
         if (tank != null) {
-            ResourceLocation fluidLocation = NeoForgeRegistries.FLUIDS.getKey(stack.getFluid());
+            ResourceLocation fluidLocation = BuiltInRegistries.FLUID.getKey(stack.getFluid());
             return (int) tank.fill(fluidLocation.getPath(), fluidLocation.getNamespace(), stack.getAmount(), doFill == FluidAction.EXECUTE);
         } else {
             return 0;
@@ -133,17 +129,7 @@ public class BuilderTileEntityFluidTank extends BuilderTileEntity implements IFl
 
     @Override
     public FluidStack drain(FluidStack stack, FluidAction doDrain) {
-        ResourceLocation fluidLocation = NeoForgeRegistries.FLUIDS.getKey(stack.getFluid());
+        ResourceLocation fluidLocation = BuiltInRegistries.FLUID.getKey(stack.getFluid());
         return new FluidStack(stack.getFluid(), (int) (tank != null ? tank.drain(fluidLocation.getPath(), fluidLocation.getNamespace(), stack.getAmount(), doDrain == FluidAction.EXECUTE) : 0));
-    }
-
-    @SuppressWarnings("unchecked")
-    @Override
-    public <T> LazyOptional<T> getCapability(Capability<T> capability, Direction facing) {
-        if (capability == ForgeCapabilities.FLUID_HANDLER && facing == Direction.DOWN) {
-            return LazyOptional.of(() -> (T) this);
-        } else {
-            return super.getCapability(capability, facing);
-        }
     }
 }

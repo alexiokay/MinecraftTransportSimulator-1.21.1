@@ -15,30 +15,55 @@ import minecrafttransportsimulator.packets.components.APacketBase;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
-import net.neoforged.neoforge.network.NetworkDirection;
-import net.neoforged.neoforge.network.NetworkEvent;
-import net.neoforged.neoforge.network.NetworkRegistry;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.neoforged.neoforge.network.PacketDistributor;
-import net.neoforged.neoforge.network.simple.SimpleChannel;
+import net.neoforged.neoforge.network.handling.IPayloadContext;
+import net.neoforged.neoforge.network.registration.PayloadRegistrar;
 
 class InterfacePacket implements IInterfacePacket {
     private static final String PROTOCOL_VERSION = "1";
-    private static final SimpleChannel network = NetworkRegistry.newSimpleChannel(new ResourceLocation(InterfaceLoader.MODID, "main"), () -> PROTOCOL_VERSION, PROTOCOL_VERSION::equals, PROTOCOL_VERSION::equals);
     private static final BiMap<Byte, Class<? extends APacketBase>> packetMappings = HashBiMap.create();
+    private static PayloadRegistrar registrar;
+    private static boolean initialized = false;
 
     /**
      * Called to init this network.  Needs to be done after networking is ready.
      * Packets should be registered at this point in this constructor.
      */
-    public static void init() {
-        //Register the main wrapper packet.
-        network.registerMessage(0, WrapperPacket.class, WrapperPacket::toBytes, WrapperPacket::fromBytes, WrapperPacket::handle);
+    public static void init(PayloadRegistrar payloadRegistrar) {
+        // Use synchronized block to prevent race conditions
+        synchronized (InterfacePacket.class) {
+            if (initialized) {
+                InterfaceManager.coreInterface.logError("PACKET WARNING: init() already completed! Ignoring duplicate call to prevent re-registration errors.");
+                return;
+            }
+
+            // Set initialized IMMEDIATELY to prevent any race conditions
+            initialized = true;
+            InterfaceManager.coreInterface.logError("PACKET DEBUG: Initializing packet system for first time");
+            registrar = payloadRegistrar;
+
+        // Register the main wrapper packet payload for bidirectional communication
+        // In NeoForge 1.21.1, we use playBidirectional for two-way communication
+        try {
+            registrar.playBidirectional(
+                WrapperPacket.TYPE,
+                WrapperPacket.STREAM_CODEC,
+                WrapperPacket::handle
+            );
+            InterfaceManager.coreInterface.logError("PACKET DEBUG: Successfully registered bidirectional packet");
+        } catch (Exception e) {
+            InterfaceManager.coreInterface.logError("PACKET ERROR: Failed to register bidirectional packet: " + e.getMessage());
+            e.printStackTrace();
+        }
 
         //Register internal packets, then external.
         byte packetIndex = 0;
         InterfaceManager.packetInterface.registerPacket(packetIndex++, PacketEntityCSHandshakeClient.class);
         InterfaceManager.packetInterface.registerPacket(packetIndex++, PacketEntityCSHandshakeServer.class);
         APacketBase.initPackets(packetIndex);
+        } // End synchronized block
     }
 
     @Override
@@ -53,25 +78,25 @@ class InterfacePacket implements IInterfacePacket {
 
     @Override
     public void sendToServer(APacketBase packet) {
-        network.sendToServer(new WrapperPacket(packet));
+        PacketDistributor.sendToServer(new WrapperPacket(packet));
     }
 
     @Override
     public void sendToAllClients(APacketBase packet) {
-        network.send(PacketDistributor.ALL.noArg(), new WrapperPacket(packet));
+        PacketDistributor.sendToAllPlayers(new WrapperPacket(packet));
     }
 
     @Override
     public void sendToPlayer(APacketBase packet, IWrapperPlayer player) {
-        network.send(PacketDistributor.PLAYER.with(() -> (ServerPlayer) ((WrapperPlayer) player).player), new WrapperPacket(packet));
+        PacketDistributor.sendToPlayer((ServerPlayer) ((WrapperPlayer) player).player, new WrapperPacket(packet));
     }
 
     /**
      * Gets the world this packet was sent from based on its context.
      * Used for handling packets arriving on the server.
      */
-    private static AWrapperWorld getServerWorld(Supplier<NetworkEvent.Context> ctx) {
-        return WrapperWorld.getWrapperFor(ctx.get().getSender().level());
+    private static AWrapperWorld getServerWorld(IPayloadContext ctx) {
+        return WrapperWorld.getWrapperFor(ctx.player().level());
     }
 
     @Override
@@ -92,11 +117,18 @@ class InterfacePacket implements IInterfacePacket {
      * That's up to us to handle via the packet's first byte.  Also note that this class
      * must be public, as if it is private MC won't be able to construct it due to access violations.
      */
-    public static class WrapperPacket {
+    public static class WrapperPacket implements CustomPacketPayload {
+        public static final CustomPacketPayload.Type<WrapperPacket> TYPE = new CustomPacketPayload.Type<>(ResourceLocation.fromNamespaceAndPath(InterfaceLoader.MODID, "wrapper"));
+
+        public static final StreamCodec<FriendlyByteBuf, WrapperPacket> STREAM_CODEC = StreamCodec.<FriendlyByteBuf, WrapperPacket>of(
+            (buf, message) -> WrapperPacket.toBytes(message, buf),
+            (buf) -> WrapperPacket.fromBytes(buf)
+        );
+
         private APacketBase packet;
 
         /**
-         * Do NOT call!  Required to keep Forge from crashing.
+         * Do NOT call!  Required to keep NeoForge from crashing.
          **/
         public WrapperPacket() {
         }
@@ -105,30 +137,53 @@ class InterfacePacket implements IInterfacePacket {
             this.packet = packet;
         }
 
+        @Override
+        public CustomPacketPayload.Type<? extends CustomPacketPayload> type() {
+            return TYPE;
+        }
+
         public static WrapperPacket fromBytes(FriendlyByteBuf buf) {
-            byte packetIndex = buf.readByte();
             try {
+                byte packetIndex = buf.readByte();
+                InterfaceManager.coreInterface.logError("PACKET DEBUG: Decoding packet with index: " + packetIndex);
+
                 Class<? extends APacketBase> packetClass = packetMappings.get(packetIndex);
+                if (packetClass == null) {
+                    throw new IllegalStateException("No packet class registered for index " + packetIndex + ". Registered indices: " + packetMappings.keySet());
+                }
+
+                InterfaceManager.coreInterface.logError("PACKET DEBUG: Creating packet of class: " + packetClass.getSimpleName());
                 return new WrapperPacket(packetClass.getConstructor(ByteBuf.class).newInstance(buf));
             } catch (Exception e) {
+                InterfaceManager.coreInterface.logError("PACKET ERROR: Failed to decode packet! Exception: " + e.getClass().getSimpleName() + ": " + e.getMessage());
                 e.printStackTrace();
-                throw new IndexOutOfBoundsException("Was asked to create packet of index " + packetIndex + " but we haven't registered that one yet!");
+                throw new RuntimeException("Packet decoding failed", e);
             }
         }
 
         public static void toBytes(WrapperPacket message, FriendlyByteBuf buf) {
-            message.packet.writeToBuffer(buf);
+            try {
+                // Don't write packet index here - writeToBuffer() already does that!
+                byte packetIndex = InterfaceManager.packetInterface.getPacketIndex(message.packet);
+                InterfaceManager.coreInterface.logError("PACKET DEBUG: Encoding packet " + message.packet.getClass().getSimpleName() + " with index: " + packetIndex);
+
+                message.packet.writeToBuffer(buf);
+            } catch (Exception e) {
+                InterfaceManager.coreInterface.logError("PACKET ERROR: Failed to encode packet! Exception: " + e.getClass().getSimpleName() + ": " + e.getMessage());
+                e.printStackTrace();
+                throw new RuntimeException("Packet encoding failed", e);
+            }
         }
 
-        public static void handle(WrapperPacket message, Supplier<NetworkEvent.Context> ctx) {
+        public static void handle(WrapperPacket message, IPayloadContext ctx) {
             if (message.packet.runOnMainThread()) {
                 //Need to put this in a runnable to not run it on the network thread and get a CME.
-                ctx.get().enqueueWork(() -> {
+                ctx.enqueueWork(() -> {
                     //We need to use side-specific getters here to avoid side-specific classes from trying to be loaded
                     //by the JVM when this method is created.  Failure to do this will result in network faults.
                     //For this, we use abstract methods that are extended in our sub-classes.
                     AWrapperWorld world;
-                    if (ctx.get().getDirection() == NetworkDirection.PLAY_TO_SERVER) {
+                    if (ctx.flow().isServerbound()) {
                         world = getServerWorld(ctx);
                     } else {
                         world = InterfaceManager.clientInterface.getClientWorld();
@@ -138,13 +193,12 @@ class InterfacePacket implements IInterfacePacket {
                     }
                 });
             } else {
-                if (ctx.get().getDirection() == NetworkDirection.PLAY_TO_SERVER) {
+                if (ctx.flow().isServerbound()) {
                     message.packet.handle(getServerWorld(ctx));
                 } else {
                     message.packet.handle(InterfaceManager.clientInterface.getClientWorld());
                 }
             }
-            ctx.get().setPacketHandled(true);
         }
     }
 }

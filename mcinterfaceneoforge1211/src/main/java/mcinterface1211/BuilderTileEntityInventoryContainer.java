@@ -8,12 +8,10 @@ import net.minecraft.core.Direction;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockState;
-import net.neoforged.neoforge.common.capabilities.Capability;
-import net.neoforged.neoforge.common.capabilities.ForgeCapabilities;
-import net.neoforged.neoforge.common.util.LazyOptional;
+import net.neoforged.neoforge.capabilities.Capabilities;
 import net.neoforged.neoforge.items.IItemHandler;
 import net.neoforged.neoforge.items.ItemHandlerHelper;
-import net.neoforged.neoforge.registries.RegistryObject;
+import java.util.function.Supplier;
 
 /**
  * Builder for tile entities that contain inventories.  This builder ticks.
@@ -21,7 +19,7 @@ import net.neoforged.neoforge.registries.RegistryObject;
  * @author don_bruce
  */
 public class BuilderTileEntityInventoryContainer extends BuilderTileEntity implements IItemHandler {
-    protected static RegistryObject<BlockEntityType<BuilderTileEntityInventoryContainer>> TE_TYPE2;
+    protected static Supplier<BlockEntityType<BuilderTileEntityInventoryContainer>> TE_TYPE2;
 
     private EntityInventoryContainer inventory;
 
@@ -63,7 +61,7 @@ public class BuilderTileEntityInventoryContainer extends BuilderTileEntity imple
     @Override
     public ItemStack insertItem(int slot, ItemStack stack, boolean simulate) {
         ItemStack existingStack = getStackInSlot(slot);
-        if (ItemHandlerHelper.canItemStacksStack(stack, existingStack)) {
+        if (ItemStack.isSameItemSameComponents(stack, existingStack)) {
             int amount = existingStack.getMaxStackSize() - existingStack.getCount();
             if (amount != 0) {
                 if (amount > stack.getCount()) {
@@ -91,13 +89,16 @@ public class BuilderTileEntityInventoryContainer extends BuilderTileEntity imple
         return true;
     }
 
+    // STUB: Capability method - TODO: Replace with NeoForge DataAttachments
+    /*
     @SuppressWarnings("unchecked")
     @Override
     public <T> LazyOptional<T> getCapability(Capability<T> capability, Direction facing) {
-        if (capability == ForgeCapabilities.ITEM_HANDLER && (facing == Direction.UP || facing == Direction.DOWN)) {
+        if (capability == Capabilities.ItemHandler.BLOCK && (facing == Direction.UP || facing == Direction.DOWN)) {
             return LazyOptional.of(() -> (T) this);
         } else {
             return super.getCapability(capability, facing);
         }
     }
+    */
 }

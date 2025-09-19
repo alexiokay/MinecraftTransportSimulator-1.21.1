@@ -21,16 +21,18 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.tags.DamageTypeTags;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.Entity.RemovalReason;
 import net.minecraft.world.entity.EntityDimensions;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.Pose;
+import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.event.level.ExplosionEvent;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
-import net.neoforged.neoforge.registries.RegistryObject;
+import java.util.function.Supplier;
 
 /**
  * Builder for the main entity classes for MTS.  This builder allows us to create a new entity
@@ -45,8 +47,8 @@ import net.neoforged.neoforge.registries.RegistryObject;
  */
 @EventBusSubscriber
 public class BuilderEntityExisting extends ABuilderEntityBase {
-    public static RegistryObject<EntityType<BuilderEntityExisting>> E_TYPE2;
-    private EntityDimensions mutableDims = new EntityDimensions(1.0F, 1.0F, false);
+    public static Supplier<EntityType<BuilderEntityExisting>> E_TYPE2;
+    private EntityDimensions mutableDims = EntityDimensions.scalable(1.0F, 1.0F);
 
     /**
      * Maps Entity class names to instances of the IItemEntityProvider class that creates them.
@@ -72,6 +74,11 @@ public class BuilderEntityExisting extends ABuilderEntityBase {
 
     public BuilderEntityExisting(EntityType<? extends BuilderEntityExisting> eType, Level world) {
         super(eType, world);
+    }
+
+    @Override
+    protected void defineSynchedData(SynchedEntityData.Builder builder) {
+        super.defineSynchedData(builder);
     }
 
     @Override
@@ -113,7 +120,7 @@ public class BuilderEntityExisting extends ABuilderEntityBase {
                     setBoundingBox(collisionBoxes);
                     interactAttackBoxes = new WrapperAABBCollective(interactable, false);
                     if (entity instanceof EntityVehicleF_Physics && interactable.ticksExisted > 1 && interactable.ticksExisted % 20 == 0) {
-                        mutableDims = new EntityDimensions((float) Math.max(interactable.encompassingBox.widthRadius * 2F, interactable.encompassingBox.depthRadius * 2F), (float) interactable.encompassingBox.heightRadius * 2F, false);
+                        mutableDims = EntityDimensions.scalable((float) Math.max(interactable.encompassingBox.widthRadius * 2F, interactable.encompassingBox.depthRadius * 2F), (float) interactable.encompassingBox.heightRadius * 2F);
                         //Make sure the collision bounds for MC are big enough to collide with this entity.
                         double maxEntityRadius = level().getMaxEntityRadius();
                         if (maxEntityRadius < interactable.encompassingBox.widthRadius || maxEntityRadius < interactable.encompassingBox.heightRadius || maxEntityRadius < interactable.encompassingBox.depthRadius) {
@@ -135,7 +142,18 @@ public class BuilderEntityExisting extends ABuilderEntityBase {
                 WrapperWorld worldWrapper = WrapperWorld.getWrapperFor(level());
                 try {
                     WrapperNBT data = new WrapperNBT(lastLoadedNBT);
-                    entity = entityMap.get(lastLoadedNBT.getString("entityid")).restoreEntityFromData(worldWrapper, data);
+                    String entityId = lastLoadedNBT.getString("entityid");
+                    InterfaceManager.coreInterface.logError("ENTITY DEBUG: Attempting to load entity with ID: '" + entityId + "'");
+                    InterfaceManager.coreInterface.logError("ENTITY DEBUG: Available entity IDs: " + entityMap.keySet());
+                    InterfaceManager.coreInterface.logError("ENTITY DEBUG: EntityMap size: " + entityMap.size());
+
+                    if (entityMap.get(entityId) == null) {
+                        InterfaceManager.coreInterface.logError("ENTITY DEBUG: Entity factory not found for ID: '" + entityId + "'");
+                        InterfaceManager.coreInterface.logError("ENTITY DEBUG: This entity will be skipped");
+                        return;
+                    }
+
+                    entity = entityMap.get(entityId).restoreEntityFromData(worldWrapper, data);
                     entity.world.addEntity(entity);
                     if (entity instanceof AEntityF_Multipart) {
                         ((AEntityF_Multipart<?>) entity).addPartsPostAddition(null, data);
@@ -157,8 +175,8 @@ public class BuilderEntityExisting extends ABuilderEntityBase {
     }
 
     @Override
-    public void onRemovedFromWorld() {
-        super.onRemovedFromWorld();
+    public void remove(RemovalReason reason) {
+        super.remove(reason);
         //Notify internal entity of it being invalid.
         if (entity != null) {
             entity.remove();
@@ -247,10 +265,10 @@ public class BuilderEntityExisting extends ABuilderEntityBase {
      * Whenever we have an explosion detonated in the world, save it's position.  We can then use it
      * in {@link #attackEntityFrom(DamageSource, float)} to tell the system which part to attack.
      */
-    @EventHandler
+    @SubscribeEvent
     public static void onIVExplode(ExplosionEvent.Detonate event) {
         if (!event.getLevel().isClientSide) {
-            lastExplosionPosition = new Point3D(event.getExplosion().getPosition().x, event.getExplosion().getPosition().y, event.getExplosion().getPosition().z);
+            lastExplosionPosition = new Point3D(event.getExplosion().center().x(), event.getExplosion().center().y(), event.getExplosion().center().z());
         }
     }
 }

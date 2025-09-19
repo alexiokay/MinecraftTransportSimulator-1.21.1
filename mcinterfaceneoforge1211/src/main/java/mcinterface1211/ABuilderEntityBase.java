@@ -13,6 +13,8 @@ import net.minecraft.network.protocol.game.ClientGamePacketListener;
 import net.minecraft.network.protocol.game.ClientboundAddEntityPacket;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
+import net.minecraft.network.syncher.SynchedEntityData;
+import net.minecraft.server.level.ServerEntity;
 import net.minecraft.world.level.Level;
 import net.neoforged.neoforge.registries.DeferredRegister;
 
@@ -112,7 +114,6 @@ public abstract class ABuilderEntityBase extends Entity {
         }
     }
 
-    @Override
     public void lerpTo(double pX, double pY, double pZ, float pYRot, float pXRot, int pLerpSteps, boolean pTeleport) {
         //Overridden due to stupid tracker behavior.
     }
@@ -152,11 +153,11 @@ public abstract class ABuilderEntityBase extends Entity {
     }
 
     @Override
-    protected void defineSynchedData() {
+    protected void defineSynchedData(SynchedEntityData.Builder builder) {
     }
 
     @Override
-    public Packet<ClientGamePacketListener> getAddEntityPacket() {
-        return new ClientboundAddEntityPacket(this);
+    public Packet<ClientGamePacketListener> getAddEntityPacket(ServerEntity serverEntity) {
+        return super.getAddEntityPacket(serverEntity);
     }
 }

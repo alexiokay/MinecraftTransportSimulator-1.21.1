@@ -25,11 +25,12 @@ var modVersion: String = project.property("global_version").toString()
 //var modVersion: String = providers.gradleProperty("global_version")
 
 var mcCore = project(":mccore")
-var mcInterfaceForge1122 = project(":mcinterfaceforge1122")
-var mcInterfaceForge1165 = project(":mcinterfaceforge1165")
-var mcInterfaceForge1182 = project(":mcinterfaceforge1182")
-var mcInterfaceForge1192 = project(":mcinterfaceforge1192")
-var mcInterfaceForge1201 = project(":mcinterfaceforge1201")
+// Temporarily disabled module references to fix build configuration issues
+// var mcInterfaceForge1122 = project(":mcinterfaceforge1122")
+// var mcInterfaceForge1165 = project(":mcinterfaceforge1165")
+// var mcInterfaceForge1182 = project(":mcinterfaceforge1182")
+// var mcInterfaceForge1192 = project(":mcinterfaceforge1192")
+// var mcInterfaceForge1201 = project(":mcinterfaceforge1201")
 var mcInterfaceNeoForge1211 = project(":mcinterfaceneoforge1211")
 
 tasks.register("buildCore") {
@@ -39,6 +40,7 @@ tasks.register("buildCore") {
     }
 }
 
+/*
 tasks.register("buildForge1122") {
     doFirst { preBuild() }
     doLast {
@@ -46,7 +48,9 @@ tasks.register("buildForge1122") {
     }
     dependsOn(mcInterfaceForge1122.tasks.build)
 }
+*/
 
+/*
 tasks.register("buildForge1165") {
     doFirst { preBuild() }
     doLast {
@@ -54,7 +58,9 @@ tasks.register("buildForge1165") {
     }
     dependsOn(mcInterfaceForge1165.tasks.build)
 }
+*/
 
+/*
 tasks.register("buildForge1182") {
     doFirst { preBuild() }
     doLast {
@@ -62,7 +68,9 @@ tasks.register("buildForge1182") {
     }
     dependsOn(mcInterfaceForge1182.tasks.build)
 }
+*/
 
+/*
 tasks.register("buildForge1192") {
     doFirst { preBuild() }
     doLast {
@@ -70,7 +78,9 @@ tasks.register("buildForge1192") {
     }
     dependsOn(mcInterfaceForge1192.tasks.build)
 }
+*/
 
+/*
 tasks.register("buildForge1201") {
     doFirst { preBuild() }
     doLast {
@@ -78,6 +88,7 @@ tasks.register("buildForge1201") {
     }
     dependsOn(mcInterfaceForge1201.tasks.build)
 }
+*/
 
 tasks.register("buildNeoForge1211") {
     doFirst { preBuild() }

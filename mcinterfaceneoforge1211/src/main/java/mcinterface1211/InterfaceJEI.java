@@ -36,7 +36,7 @@ public class InterfaceJEI implements IModPlugin {
 
     @Override
     public ResourceLocation getPluginUid() {
-        return new ResourceLocation(InterfaceLoader.MODID, "main");
+        return ResourceLocation.fromNamespaceAndPath(InterfaceLoader.MODID, "main");
     }
 
     @Override
@@ -103,7 +103,7 @@ public class InterfaceJEI implements IModPlugin {
         private BenchRecipeCategory(ItemDecor benchItem, List<PackRecipeWrapper> benchRecipes, IGuiHelper guiHelper) {
             this.benchItem = benchItem;
             this.benchRecipes = benchRecipes;
-            this.background = guiHelper.createDrawable(new ResourceLocation(InterfaceLoader.MODID, "textures/guis/jei_crafting.png"), 0, 0, 134, 97);
+            this.background = guiHelper.createDrawable(ResourceLocation.fromNamespaceAndPath(InterfaceLoader.MODID, "textures/guis/jei_crafting.png"), 0, 0, 134, 97);
             this.icon = guiHelper.createDrawableIngredient(VanillaTypes.ITEM_STACK, ((WrapperItemStack) benchItem.getNewStack(null)).stack);
         }
 

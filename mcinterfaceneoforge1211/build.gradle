@@ -26,17 +26,12 @@ repositories {
 configurations {
     embed
     implementation.extendsFrom(embed)
+    jarJar
 }
 
 //NeoForge configuration
 neoForge {
     version = project.neoforge_version
-
-    // Parchment mappings are optional, commenting out for now
-    // parchment {
-    //     mappingsVersion = project.mappings_version
-    //     minecraftVersion = project.mc_version
-    // }
 
     runs {
         client {
@@ -59,27 +54,33 @@ neoForge {
     }
 }
 
-//Specify dependencies.
-dependencies {
-    //Core to use.
-    embed project(":mccore")
-
-    //JEI API
-    compileOnly "mezz.jei:${project.jei_api_version}:api"
-    runtimeOnly "mezz.jei:${project.jei_run_version}"
+//Automatically copy mccore textures during build
+processResources {
+    from(project(":mccore").sourceSets.main.resources.srcDirs) {
+        include "assets/mts/textures/**"
+    }
 }
 
-//Here is where we zip up all embeds and add them to our jar.
-jar {
-    from {
-        configurations.embed.collect { it.isDirectory() ? it : zipTree(it) }
-    }
+//Specify dependencies.
+dependencies {
+    //Core dependency for compile-time
+    implementation project(":mccore")
 
-    manifest {
-        attributes([
-                "MixinConfigs"  : project.mixin_config
-        ])
-    }
+    //Use jarJar to embed the core at runtime
+    jarJar(project(":mccore"))
+
+    //Also add to additional runtime classpath for class loading
+    additionalRuntimeClasspath project(":mccore")
+
+    //Sound libraries - temporarily disabled to test basic mod loading
+    //implementation "com.googlecode.soundlibs:jlayer:1.0.1.4"
+    //implementation "org.jcraft:jorbis:0.0.17"
+    //jarJar("com.googlecode.soundlibs:jlayer:1.0.1.4")
+    //jarJar("org.jcraft:jorbis:0.0.17")
+
+    //JEI API
+    compileOnly "mezz.jei:jei-1.21.1-neoforge:19.22.1.316"
+    runtimeOnly "mezz.jei:jei-1.21.1-neoforge:19.22.1.316"
 }
 
 tasks.withType(JavaCompile).configureEach {

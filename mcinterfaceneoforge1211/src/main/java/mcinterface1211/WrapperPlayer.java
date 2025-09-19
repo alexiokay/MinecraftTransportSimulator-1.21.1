@@ -27,7 +27,6 @@ import net.neoforged.neoforge.event.level.LevelEvent;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 
-@EventBusSubscriber
 public class WrapperPlayer extends WrapperEntity implements IWrapperPlayer {
     private static final Map<Player, WrapperPlayer> playerClientWrappers = new HashMap<>();
     private static final Map<Player, WrapperPlayer> playerServerWrappers = new HashMap<>();
@@ -171,7 +170,7 @@ public class WrapperPlayer extends WrapperEntity implements IWrapperPlayer {
     /**
      * Remove all entities from our maps if we unload the world.  This will cause duplicates if we don't.
      */
-    @EventHandler
+    @SubscribeEvent
     public static void onIVWorldUnload(LevelEvent.Unload event) {
         if (event.getLevel().isClientSide()) {
             playerClientWrappers.keySet().removeIf(entity1 -> event.getLevel() == entity1.level());

@@ -24,7 +24,7 @@ import minecrafttransportsimulator.systems.ControlSystem.ControlsJoystick;
 import minecrafttransportsimulator.systems.LanguageSystem;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
-import net.neoforged.neoforge.api.distmarker.Dist;
+import net.neoforged.api.distmarker.Dist;
 import net.neoforged.neoforge.client.event.InputEvent;
 import net.neoforged.neoforge.client.event.RegisterKeyMappingsEvent;
 import net.neoforged.neoforge.client.event.ScreenEvent;
@@ -283,7 +283,7 @@ public class InterfaceInput implements IInterfaceInput {
      * Opens the config screen when the config key is pressed.
      * Also init the joystick system if we haven't already.
      */
-    @EventHandler
+    @SubscribeEvent
     public static void onIVKeyInput(InputEvent.Key event) {
         //Check if we pressed the config or import key.
         if (configKey.isDown() && !InterfaceManager.clientInterface.isGUIOpen()) {
@@ -296,10 +296,10 @@ public class InterfaceInput implements IInterfaceInput {
     /**
      * Gets mouse scroll data, since we have to register a listner, and MC already does this for us.
      */
-    @EventHandler
+    @SubscribeEvent
     public static void onIVMouseScroll(ScreenEvent.MouseScrolled.Post event) {
         if (InterfaceManager.clientInterface.isGUIOpen()) {
-            lastScrollValue = (int) event.getScrollDelta();
+            lastScrollValue = (int) event.getScrollDeltaY();
         }
     }
 }

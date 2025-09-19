@@ -119,7 +119,7 @@ class WrapperNBT implements IWrapperNBT {
     public List<IWrapperItemStack> getStacks(int count) {
         List<IWrapperItemStack> stacks = new ArrayList<>();
         NonNullList<ItemStack> mcList = NonNullList.withSize(count, ItemStack.EMPTY);
-        ContainerHelper.loadAllItems(tag, mcList);
+        ContainerHelper.loadAllItems(tag, mcList, net.minecraft.core.RegistryAccess.EMPTY);
         for (ItemStack stack : mcList) {
             stacks.add(new WrapperItemStack(stack));
         }
@@ -132,7 +132,7 @@ class WrapperNBT implements IWrapperNBT {
         for (IWrapperItemStack stack : stacks) {
             mcList.add(((WrapperItemStack) stack).stack);
         }
-        ContainerHelper.saveAllItems(tag, mcList);
+        ContainerHelper.saveAllItems(tag, mcList, net.minecraft.core.RegistryAccess.EMPTY);
     }
 
     @Override

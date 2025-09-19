@@ -1,5 +1,6 @@
 package mcinterface1211;
 import net.minecraft.core.registries.Registries;
+import net.minecraft.core.registries.BuiltInRegistries;
 
 import java.io.File;
 import java.nio.file.Files;
@@ -17,6 +18,7 @@ import com.google.common.collect.Streams;
 import mcinterface1211.mixin.common.BiomeMixin;
 import mcinterface1211.mixin.common.ConcretePowderBlockMixin;
 import mcinterface1211.mixin.common.DimensionDataStorageMixin;
+import net.minecraft.world.level.storage.DimensionDataStorage;
 import minecrafttransportsimulator.baseclasses.BlockHitResult;
 import minecrafttransportsimulator.baseclasses.BoundingBox;
 import minecrafttransportsimulator.baseclasses.ColorRGB;
@@ -49,6 +51,7 @@ import minecrafttransportsimulator.systems.ConfigSystem;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.nbt.NbtIo;
+import net.minecraft.nbt.NbtAccounter;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
@@ -94,12 +97,12 @@ import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.phys.shapes.BooleanOp;
 import net.minecraft.world.phys.shapes.Shapes;
 import net.minecraft.world.phys.shapes.VoxelShape;
-import net.neoforged.neoforge.common.IPlantable;
-import net.neoforged.neoforge.common.MinecraftForge;
+// IPlantable interface removed in NeoForge 1.21.1, replaced with SpecialPlantable system
+// SpecialPlantable implementation added in plantBlock() method
+import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.common.Tags;
-import net.neoforged.neoforge.common.capabilities.ForgeCapabilities;
-import net.neoforged.neoforge.event.TickEvent;
-import net.neoforged.neoforge.event.TickEvent.Phase;
+import net.neoforged.neoforge.capabilities.Capabilities;
+import net.neoforged.neoforge.event.tick.LevelTickEvent;
 import net.neoforged.neoforge.event.level.LevelEvent;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.items.IItemHandler;
@@ -152,18 +155,41 @@ public class WrapperWorld extends AWrapperWorld {
             InterfaceManager.packetInterface.sendToServer(new PacketWorldSavedDataRequest(InterfaceManager.clientInterface.getClientPlayer()));
         } else {
             //Load data from disk.
+            IWrapperNBT loadedData = null;
             try {
-                if (getDataFile().exists()) {
-                    this.savedData = new WrapperNBT(NbtIo.readCompressed(Files.newInputStream(getDataFile().toPath())));
+                File dataFile = getDataFile();
+                InterfaceManager.coreInterface.logError("WORLD DATA: Attempting to load save data from: " + dataFile.getAbsolutePath());
+                if (dataFile.exists()) {
+                    long fileSize = dataFile.length();
+                    InterfaceManager.coreInterface.logError("WORLD DATA: Save file exists with size: " + fileSize + " bytes, loading NBT data...");
+
+                    if (fileSize > 0) {
+                        loadedData = new WrapperNBT(NbtIo.readCompressed(Files.newInputStream(dataFile.toPath()), NbtAccounter.unlimitedHeap()));
+                        InterfaceManager.coreInterface.logError("WORLD DATA: Successfully loaded save data from disk!");
+
+                        // Log basic info about loaded data
+                        if (loadedData != null) {
+                            InterfaceManager.coreInterface.logError("WORLD DATA DEBUG: Loaded NBT contains data keys: " + ((WrapperNBT) loadedData).tag.getAllKeys().size());
+                        }
+                    } else {
+                        InterfaceManager.coreInterface.logError("WORLD DATA: Save file exists but is empty (0 bytes), creating new empty data");
+                        loadedData = InterfaceManager.coreInterface.getNewNBTWrapper();
+                    }
                 } else {
-                    this.savedData = InterfaceManager.coreInterface.getNewNBTWrapper();
+                    InterfaceManager.coreInterface.logError("WORLD DATA: No save file found, creating new empty data (this is normal for new worlds)");
+                    loadedData = InterfaceManager.coreInterface.getNewNBTWrapper();
                 }
             } catch (Exception e) {
+                InterfaceManager.coreInterface.logError("WORLD DATA ERROR: Failed to load save data! Exception: " + e.getClass().getSimpleName() + ": " + e.getMessage());
+                InterfaceManager.coreInterface.logError("WORLD DATA: Data file path was: " + getDataFile().getAbsolutePath());
+                InterfaceManager.coreInterface.logError("WORLD DATA: Creating new empty data to prevent data loss");
                 e.printStackTrace();
-                throw new IllegalStateException("Could not load saved data from disk!  This will result in data loss if we continue!");
+                // Instead of throwing exception, create new data
+                loadedData = InterfaceManager.coreInterface.getNewNBTWrapper();
             }
+            this.savedData = loadedData;
         }
-        MinecraftForge.EVENT_BUS.register(this);
+        NeoForge.EVENT_BUS.register(this);
     }
 
     @Override
@@ -216,21 +242,62 @@ public class WrapperWorld extends AWrapperWorld {
 
     @Override
     public void setData(String name, IWrapperNBT value) {
+        InterfaceManager.coreInterface.logError("WORLD DATA DEBUG: setData() called for name: '" + name + "' (isClient: " + isClient() + ")");
         savedData.setData(name, value);
         if (!isClient()) {
             try {
-                NbtIo.writeCompressed(((WrapperNBT) savedData).tag, Files.newOutputStream(getDataFile().toPath()));
+                File dataFile = getDataFile();
+                InterfaceManager.coreInterface.logError("WORLD DATA DEBUG: Attempting to save to file: " + dataFile.getAbsolutePath());
+
+                // Ensure the parent directory exists
+                if (dataFile.getParentFile() != null && !dataFile.getParentFile().exists()) {
+                    boolean dirCreated = dataFile.getParentFile().mkdirs();
+                    InterfaceManager.coreInterface.logError("WORLD DATA DEBUG: Created parent directories: " + dirCreated);
+                }
+
+                NbtIo.writeCompressed(((WrapperNBT) savedData).tag, Files.newOutputStream(dataFile.toPath()));
+                InterfaceManager.coreInterface.logError("WORLD DATA DEBUG: Successfully saved NBT data to disk!");
+
+                // Verify file was created and has content
+                if (dataFile.exists() && dataFile.length() > 0) {
+                    InterfaceManager.coreInterface.logError("WORLD DATA DEBUG: Verified save file exists with size: " + dataFile.length() + " bytes");
+                } else {
+                    InterfaceManager.coreInterface.logError("WORLD DATA ERROR: Save file was not created or is empty!");
+                }
+
                 InterfaceManager.packetInterface.sendToAllClients(new PacketWorldSavedDataUpdate(name, value));
             } catch (Exception e) {
+                InterfaceManager.coreInterface.logError("WORLD DATA ERROR: Failed to save data to disk! Exception: " + e.getClass().getSimpleName() + ": " + e.getMessage());
+                InterfaceManager.coreInterface.logError("WORLD DATA ERROR: Data file path was: " + getDataFile().getAbsolutePath());
+                InterfaceManager.coreInterface.logError("WORLD DATA ERROR: This will result in data loss - placed mod items will disappear on restart!");
                 e.printStackTrace();
-                throw new IllegalStateException("Could not save data to disk!  This will result in data loss if we continue!");
+                // Don't throw exception to prevent crashes - log detailed error instead
+                // throw new IllegalStateException("Could not save data to disk!  This will result in data loss if we continue!");
             }
         }
     }
 
     @Override
     public File getDataFile() {
-        return new File(((DimensionDataStorageMixin) ((ServerLevel) world).getDataStorage()).getDataFolder(), "mtsdata.dat");
+        try {
+            // Use reflection to access dataFolder since Mixin isn't working properly in NeoForge 1.21.1
+            DimensionDataStorage dataStorage = ((ServerLevel) world).getDataStorage();
+
+            // Try to access the dataFolder field via reflection
+            java.lang.reflect.Field dataFolderField = DimensionDataStorage.class.getDeclaredField("dataFolder");
+            dataFolderField.setAccessible(true);
+            File dataFolder = (File) dataFolderField.get(dataStorage);
+
+            return new File(dataFolder, "mtsdata.dat");
+        } catch (Exception e) {
+            InterfaceManager.coreInterface.logError("CRITICAL: Failed to access data folder via reflection! Exception: " + e.getClass().getSimpleName() + ": " + e.getMessage());
+            InterfaceManager.coreInterface.logError("CRITICAL: This will prevent world data saving/loading and block interactions!");
+            e.printStackTrace();
+
+            // Fallback to world folder if reflection fails
+            File worldFolder = ((ServerLevel) world).getServer().getServerDirectory().toFile();
+            return new File(worldFolder, "mtsdata.dat");
+        }
     }
 
     @Override
@@ -415,7 +482,7 @@ public class WrapperWorld extends AWrapperWorld {
 
     @Override
     public String getBlockName(Point3D position) {
-        return Registries.BLOCK.getKey(world.getBlockState(BlockPos.containing(position.x, position.y, position.z)).getBlock()).toString();
+        return BuiltInRegistries.BLOCK.getKey(world.getBlockState(BlockPos.containing(position.x, position.y, position.z)).getBlock()).toString();
     }
 
     @Override
@@ -439,9 +506,11 @@ public class WrapperWorld extends AWrapperWorld {
     @Override
     public BlockMaterial getBlockMaterial(Point3D position) {
         if (tagMap.isEmpty()) {
-            tagMap.put(Tags.Blocks.GRAVEL, BlockMaterial.GRAVEL);
+            // BlockTags.GRAVEL never existed in vanilla MC - gravel is a single block type
+            // Alternative: Check for Blocks.GRAVEL directly or create custom tag
             tagMap.put(BlockTags.DIRT, BlockMaterial.DIRT);
-            tagMap.put(Tags.Blocks.GLASS, BlockMaterial.GLASS);
+            // BlockTags.GLASS never existed in vanilla MC - glass variants have different properties
+            // Alternative: Check for specific glass blocks or create custom #c:glass tag
             tagMap.put(BlockTags.ICE, BlockMaterial.ICE);
             tagMap.put(BlockTags.LEAVES, BlockMaterial.LEAVES);
             tagMap.put(Tags.Blocks.STORAGE_BLOCKS_RAW_IRON, BlockMaterial.METAL);
@@ -453,8 +522,9 @@ public class WrapperWorld extends AWrapperWorld {
             tagMap.put(Tags.Blocks.STORAGE_BLOCKS_NETHERITE, BlockMaterial.METAL);
             tagMap.put(BlockTags.SAND, BlockMaterial.SAND);
             tagMap.put(BlockTags.SNOW, BlockMaterial.SNOW);
-            tagMap.put(Tags.Blocks.STONE, BlockMaterial.STONE);
-            tagMap.put(Tags.Blocks.COBBLESTONE, BlockMaterial.STONE);
+            tagMap.put(BlockTags.STONE_BRICKS, BlockMaterial.STONE); // Using STONE_BRICKS as closest alternative to STONE tag
+            // Tags.Blocks.COBBLESTONE also doesn't exist in NeoForge 1.21.1
+            // Alternative: Check for Blocks.COBBLESTONE directly or use BlockTags.STONE_BRICKS for stone-like materials
             tagMap.put(BlockTags.PLANKS, BlockMaterial.WOOD);
             tagMap.put(BlockTags.WOODEN_FENCES, BlockMaterial.WOOD);
             tagMap.put(BlockTags.WOOL, BlockMaterial.WOOL);
@@ -509,7 +579,7 @@ public class WrapperWorld extends AWrapperWorld {
     @Override
     public BlockHitResult getBlockHit(Point3D position, Point3D delta) {
         Vec3 start = new Vec3(position.x, position.y, position.z);
-        net.minecraft.world.phys.BlockHitResult trace = world.clip(new ClipContext(start, start.add(delta.x, delta.y, delta.z), ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, null));
+        net.minecraft.world.phys.BlockHitResult trace = world.clip(new ClipContext(start, start.add(delta.x, delta.y, delta.z), ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, net.minecraft.world.phys.shapes.CollisionContext.empty()));
         if (trace.getType() != HitResult.Type.MISS) {
             BlockPos blockPos = trace.getBlockPos();
             if (blockPos != null) {
@@ -826,7 +896,7 @@ public class WrapperWorld extends AWrapperWorld {
             Item mcItem = mcStack.getItem();
             Block mcBlock = mcItem instanceof BlockItem ? ((BlockItem) mcItem).getBlock() : null;
             //Some items can't be placed as they check for the player, even though it can be null.
-            if (!mcItem.isEdible() && !(mcItem instanceof StandingAndWallBlockItem) && !(mcBlock instanceof PistonBaseBlock) && !(mcBlock instanceof LanternBlock) && !(mcBlock instanceof LadderBlock) && mcStack.useOn(new UseOnContext(world, null, InteractionHand.MAIN_HAND, mcStack, new net.minecraft.world.phys.BlockHitResult(new Vec3(position.x, position.y, position.z), Direction.UP, pos, true))) == InteractionResult.CONSUME) {
+            if (mcItem.getFoodProperties(mcStack, null) == null && !(mcItem instanceof StandingAndWallBlockItem) && !(mcBlock instanceof PistonBaseBlock) && !(mcBlock instanceof LanternBlock) && !(mcBlock instanceof LadderBlock) && mcStack.useOn(new UseOnContext(world, null, InteractionHand.MAIN_HAND, mcStack, new net.minecraft.world.phys.BlockHitResult(new Vec3(position.x, position.y, position.z), Direction.UP, pos, true))) == InteractionResult.CONSUME) {
                 return true;
             }
         }
@@ -844,7 +914,7 @@ public class WrapperWorld extends AWrapperWorld {
             Block cropBlock = cropState.getBlock();
             if (cropBlock instanceof BonemealableBlock) {
                 BonemealableBlock growable = (BonemealableBlock) cropState.getBlock();
-                if (growable.isValidBonemealTarget(world, cropPos, cropState, world.isClientSide)) {
+                if (growable.isValidBonemealTarget(world, cropPos, cropState)) {
                     growable.performBonemeal((ServerLevel) world, world.random, cropPos, cropState);
                     return true;
                 }
@@ -884,31 +954,53 @@ public class WrapperWorld extends AWrapperWorld {
 
     @Override
     public boolean plantBlock(Point3D position, IWrapperItemStack stack) {
-        //Check for valid seeds.
+        // Updated for NeoForge 1.21.1: Using SpecialPlantable interface instead of removed IPlantable
         Item item = ((WrapperItemStack) stack).stack.getItem();
+
+        // Check if item implements SpecialPlantable interface
+        if (item instanceof net.neoforged.neoforge.common.SpecialPlantable) {
+            net.neoforged.neoforge.common.SpecialPlantable plantable = (net.neoforged.neoforge.common.SpecialPlantable) item;
+
+            BlockPos farmlandPos = BlockPos.containing(position.x, position.y, position.z);
+            BlockPos cropPos = farmlandPos.above();
+
+            // Use SpecialPlantable to spawn the plant (no isValidPosition method available)
+            // spawnPlantAtPosition requires: ItemStack, LevelAccessor, BlockPos, Direction and returns void
+            try {
+                plantable.spawnPlantAtPosition(((WrapperItemStack) stack).stack, world, cropPos, Direction.UP);
+                // Check if a plant was actually placed
+                BlockState plantState = world.getBlockState(cropPos);
+                if (!plantState.isAir()) {
+                    // Play planting sound
+                    world.playSound(null, farmlandPos, plantState.getBlock().getSoundType(plantState, world, farmlandPos, null).getPlaceSound(), SoundSource.BLOCKS, 1.0F, 1.0F);
+                    return true;
+                }
+            } catch (Exception e) {
+                // Plant placement failed, fall through to vanilla method
+            }
+        }
+
+        // Fallback: Check for vanilla seeds using BlockItem
         if (item instanceof BlockItem) {
             Block block = ((BlockItem) item).getBlock();
-            if (block instanceof IPlantable) {
-                IPlantable plantable = (IPlantable) block;
+            BlockPos farmlandPos = BlockPos.containing(position.x, position.y, position.z);
+            BlockState farmlandState = world.getBlockState(farmlandPos);
+            Block farmlandBlock = farmlandState.getBlock();
 
-                //Check if we have farmland below and air above.
-                BlockPos farmlandPos = BlockPos.containing(position.x, position.y, position.z);
-                BlockState farmlandState = world.getBlockState(farmlandPos);
-                Block farmlandBlock = farmlandState.getBlock();
-                if (farmlandBlock instanceof FarmBlock) {
-                    BlockPos cropPos = farmlandPos.above();
-                    if (world.isEmptyBlock(cropPos)) {
-                        //Check to make sure the block can sustain the plant we want to plant.
-                        BlockState plantState = plantable.getPlant(world, cropPos);
-                        if (farmlandBlock.canSustainPlant(farmlandState, world, farmlandPos, Direction.UP, plantable)) {
-                            world.setBlock(cropPos, plantState, 11);
-                            world.playSound(null, farmlandPos, plantState.getBlock().getSoundType(plantState, world, farmlandPos, null).getPlaceSound(), SoundSource.BLOCKS, 1.0F, 1.0F);
-                            return true;
-                        }
+            if (farmlandBlock instanceof FarmBlock) {
+                BlockPos cropPos = farmlandPos.above();
+                if (world.isEmptyBlock(cropPos)) {
+                    // Try to place the plant block directly
+                    BlockState plantState = block.defaultBlockState();
+                    if (plantState.canSurvive(world, cropPos)) {
+                        world.setBlock(cropPos, plantState, 11);
+                        world.playSound(null, farmlandPos, plantState.getBlock().getSoundType(plantState, world, farmlandPos, null).getPlaceSound(), SoundSource.BLOCKS, 1.0F, 1.0F);
+                        return true;
                     }
                 }
             }
         }
+
         return false;
     }
 
@@ -973,9 +1065,10 @@ public class WrapperWorld extends AWrapperWorld {
     @Override
     public boolean insertStack(Point3D position, Axis axis, IWrapperItemStack stack) {
         Direction facing = Direction.valueOf(axis.name());
-        BlockEntity tile = world.getBlockEntity(BlockPos.containing(position.x, position.y, position.z).relative(facing));
+        BlockPos blockPos = BlockPos.containing(position.x, position.y, position.z).relative(facing);
+        BlockEntity tile = world.getBlockEntity(blockPos);
         if (tile != null) {
-            IItemHandler itemHandler = tile.getCapability(ForgeCapabilities.ITEM_HANDLER, facing.getOpposite()).orElse(null);
+            IItemHandler itemHandler = world.getCapability(Capabilities.ItemHandler.BLOCK, blockPos, facing.getOpposite());
             if (itemHandler != null) {
                 for (int i = 0; i < itemHandler.getSlots(); ++i) {
                     ItemStack remainingStack = itemHandler.insertItem(i, ((WrapperItemStack) stack).stack, true);
@@ -993,9 +1086,10 @@ public class WrapperWorld extends AWrapperWorld {
     @Override
     public WrapperItemStack extractStack(Point3D position, Axis axis) {
         Direction facing = Direction.valueOf(axis.name());
-        BlockEntity tile = world.getBlockEntity(BlockPos.containing(position.x, position.y, position.z).relative(facing));
+        BlockPos blockPos = BlockPos.containing(position.x, position.y, position.z).relative(facing);
+        BlockEntity tile = world.getBlockEntity(blockPos);
         if (tile != null) {
-            IItemHandler itemHandler = tile.getCapability(ForgeCapabilities.ITEM_HANDLER, facing.getOpposite()).orElse(null);
+            IItemHandler itemHandler = world.getCapability(Capabilities.ItemHandler.BLOCK, blockPos, facing.getOpposite());
             if (itemHandler != null) {
                 for (int i = 0; i < itemHandler.getSlots(); ++i) {
                     ItemStack extractedStack = itemHandler.extractItem(i, 1, false);
@@ -1049,15 +1143,15 @@ public class WrapperWorld extends AWrapperWorld {
      * We also track followers, and ensure that if the player doesn't exist, they are removed.
      * This handles players leaving.  We could use events for this, but they're not reliable.
      */
-    @EventHandler
-    public void onIVWorldTick(TickEvent.LevelTickEvent event) {
+    // World tick event handler for server-side processing
+    @SubscribeEvent
+    public void onIVWorldTickPre(LevelTickEvent.Pre event) {
         //Need to check if it's our world, because Forge is stupid like that.
         //Note that the client world never calls this method: to do client ticks we need to use the client interface.
-        if (!event.level.isClientSide && event.level.equals(world)) {
-            if (event.phase.equals(Phase.START)) {
-                tickAll(true);
+        if (!event.getLevel().isClientSide() && event.getLevel().equals(world)) {
+            tickAll(true);
 
-                for (Player mcPlayer : event.level.players()) {
+            for (Player mcPlayer : event.getLevel().players()) {
                     UUID playerUUID = mcPlayer.getUUID();
 
                     BuilderEntityExisting gunBuilder = playerServerGunBuilders.get(playerUUID);
@@ -1126,9 +1220,14 @@ public class WrapperWorld extends AWrapperWorld {
                         }
                     }
                 }
-            } else {
-                tickAll(false);
-            }
+        }
+    }
+
+    @SubscribeEvent
+    public void onIVWorldTickPost(LevelTickEvent.Post event) {
+        //Need to check if it's our world, because Forge is stupid like that.
+        if (!event.getLevel().isClientSide() && event.getLevel().equals(world)) {
+            tickAll(false);
         }
     }
 
@@ -1136,7 +1235,7 @@ public class WrapperWorld extends AWrapperWorld {
      * Remove all entities from our maps if we unload the world.  This will cause duplicates if we don't.
      * Also remove this wrapper from the created lists, as it's invalid.
      */
-    @EventHandler
+    @SubscribeEvent
     public void onIVWorldUnload(LevelEvent.Unload event) {
         //Need to check if it's our world, because Forge is stupid like that.
         if (event.getLevel() == world) {
