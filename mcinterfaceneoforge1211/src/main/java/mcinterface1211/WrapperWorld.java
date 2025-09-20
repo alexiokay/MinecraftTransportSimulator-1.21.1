@@ -1186,12 +1186,16 @@ public class WrapperWorld extends AWrapperWorld {
                     }
 
                     if (mcPlayer.isAlive() && (gunBuilder == null || followerBuilder == null)) {
-                        //Some follower doesn't exist.  Check if player has been present for 3 seconds and spawn it.
+                        //Some follower doesn't exist.  Check if player and chunks are ready, then spawn it.
                         int totalTicksWaited = 0;
                         if (ticksSincePlayerJoin.containsKey(playerUUID)) {
                             totalTicksWaited = ticksSincePlayerJoin.get(playerUUID);
                         }
-                        if (++totalTicksWaited == 60) {
+
+                        // Check if player is fully loaded and chunk is available (minimum 5 ticks for stability)
+                        boolean playerReady = totalTicksWaited >= 5 && mcPlayer.hasPermissions(0) && mcPlayer.level().hasChunkAt(mcPlayer.blockPosition());
+
+                        if (++totalTicksWaited >= 5 && playerReady) {
                             IWrapperPlayer playerWrapper = WrapperPlayer.getWrapperFor(mcPlayer);
 
                             //Spawn gun.

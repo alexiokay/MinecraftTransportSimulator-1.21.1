@@ -79,6 +79,10 @@ public class InterfaceRender implements IInterfaceRender {
     private static final Map<String, ParsedGIF> animatedGIFs = new HashMap<>();
     private static final Map<ParsedGIF, Map<GIFImageFrame, ResourceLocation>> animatedGIFFrames = new LinkedHashMap<>();
 
+    // Texture cache to prevent loading delays during rendering
+    private static final Map<String, Boolean> textureExistenceCache = new ConcurrentHashMap<>();
+    private static final Map<String, RenderStateShard.TextureStateShard> textureStateCache = new ConcurrentHashMap<>();
+
     private static final List<GUIComponentItem> stacksToRender = new ArrayList<>();
 
     private static final ConcurrentHashMap<String, RenderType> renderTypes = new ConcurrentHashMap<>();
@@ -118,6 +122,38 @@ public class InterfaceRender implements IInterfaceRender {
 
             InterfaceManager.coreInterface.logError("TEXTURE INIT: Texture states initialized during mod setup");
             InterfaceManager.coreInterface.logError("TEXTURE INIT: Skipped first-render matrix debug to prevent delays");
+
+            // Preload common texture paths to prevent render delays
+            preloadCommonTextures();
+        }
+    }
+
+    /**
+     * Preloads common MTS textures to prevent I/O delays during first render.
+     */
+    private static void preloadCommonTextures() {
+        try {
+            // Common texture paths that are likely to be used
+            String[] commonTextures = {
+                "/assets/mts/textures/rendering/missing.png",
+                "/assets/mts/textures/rendering/fallback.png",
+                "/assets/mts/textures/entities/default.png",
+                "/assets/mts/textures/blocks/default.png",
+                "/assets/mts/textures/items/default.png"
+            };
+
+            int preloadedCount = 0;
+            for (String texturePath : commonTextures) {
+                Boolean exists = InterfaceManager.coreInterface.getPackResource(texturePath) != null;
+                textureExistenceCache.put(texturePath, exists);
+                if (exists) {
+                    preloadedCount++;
+                }
+            }
+
+            InterfaceManager.coreInterface.logError("TEXTURE INIT: Preloaded " + preloadedCount + " common textures to prevent render delays");
+        } catch (Exception e) {
+            InterfaceManager.coreInterface.logError("TEXTURE INIT: Failed to preload textures: " + e.getMessage());
         }
     }
 
@@ -629,17 +665,25 @@ public class InterfaceRender implements IInterfaceRender {
             initializeTextureStates();
         }
 
+        // Check cache first to avoid I/O delays during rendering
+        RenderStateShard.TextureStateShard cachedState = textureStateCache.get(textureLocation);
+        if (cachedState != null) {
+            return cachedState;
+        }
+
+        RenderStateShard.TextureStateShard result;
+
         if (animatedGIFs.containsKey(textureLocation)) {
             //Special case for GIFs.
             ParsedGIF parsedGIF = animatedGIFs.get(textureLocation);
-            return new RenderStateShard.TextureStateShard(animatedGIFFrames.get(parsedGIF).get(parsedGIF.getCurrentFrame()), false, false);
+            result = new RenderStateShard.TextureStateShard(animatedGIFFrames.get(parsedGIF).get(parsedGIF.getCurrentFrame()), false, false);
         } else if (onlineTextures.containsKey(textureLocation)) {
             //Online texture.
             ResourceLocation onlineTexture = onlineTextures.get(textureLocation);
-            return onlineTexture != null ? new RenderStateShard.TextureStateShard(onlineTextures.get(textureLocation), false, false) : MISSING_STATE;
+            result = onlineTexture != null ? new RenderStateShard.TextureStateShard(onlineTextures.get(textureLocation), false, false) : MISSING_STATE;
         } else if (textureLocation.equals(RenderableData.GLOBAL_TEXTURE_NAME)) {
             //Default texture.
-            return BLOCK_STATE;
+            result = BLOCK_STATE;
         } else {
             //If the texture has a colon, it's a short-hand form that needs to be converted.
             String formattedLocation = textureLocation;
@@ -647,17 +691,28 @@ public class InterfaceRender implements IInterfaceRender {
                 formattedLocation = "/assets/" + textureLocation.replace(":", "/");
             }
 
-            //Check if the texture exists.
-            if (InterfaceManager.coreInterface.getPackResource(formattedLocation) != null) {
+            // Check existence cache first
+            Boolean exists = textureExistenceCache.get(formattedLocation);
+            if (exists == null) {
+                // Only do I/O if not cached
+                exists = InterfaceManager.coreInterface.getPackResource(formattedLocation) != null;
+                textureExistenceCache.put(formattedLocation, exists);
+            }
+
+            if (exists) {
                 //Convert the classpath-location to a domain-location path for MC.
                 String domain = formattedLocation.substring("/assets/".length(), formattedLocation.indexOf("/", "/assets/".length()));
                 String location = formattedLocation.substring("/assets/".length() + domain.length() + 1);
-                return new RenderStateShard.TextureStateShard(ResourceLocation.fromNamespaceAndPath(domain, location), false, false);
+                result = new RenderStateShard.TextureStateShard(ResourceLocation.fromNamespaceAndPath(domain, location), false, false);
             } else {
                 InterfaceManager.coreInterface.logError("Could not find texture: " + formattedLocation + " Reverting to fallback texture.");
-                return MISSING_STATE;
+                result = MISSING_STATE;
             }
         }
+
+        // Cache the result for future calls
+        textureStateCache.put(textureLocation, result);
+        return result;
     }
 
     /**
@@ -675,7 +730,7 @@ public class InterfaceRender implements IInterfaceRender {
         //Render GUIs, re-creating their components if needed.
         //Set Y-axis to inverted to have correct orientation.
         matrixStack.scale(1.0F, -1.0F, 1.0F);
-        
+
         //Render main pass, then blended pass.
         int displayGUIIndex = 0;
         for (AGUIBase gui : AGUIBase.activeGUIs) {
@@ -683,47 +738,25 @@ public class InterfaceRender implements IInterfaceRender {
                 gui.setupComponentsInit(screenWidth, screenHeight);
             }
             matrixStack.pushPose();
-
-            //CRITICAL: Use NeoForge 1.21.1 GUI z-level system instead of manual depth manipulation
-            //Set GUI to render at maximum GUI depth to ensure it's in front of background blur
-            int guiZLevel;
             if (gui.capturesPlayer()) {
-                guiZLevel = 500; // High priority for player-capturing GUIs
+                //Translate in front of the main GUI components.
+                matrixStack.translate(0, 0, 250);
             } else {
-                guiZLevel = 400 + (100 * displayGUIIndex++); // Stack multiple GUIs properly
+                //Translate far enough to render behind the chat window.
+                matrixStack.translate(0, 0, -500 + 250 * displayGUIIndex++);
             }
-
-            //Use GuiGraphics z-level system - this works with NeoForge 1.21.1 strata
-            matrixStack.translate(0, 0, guiZLevel);
-
-            //Enable proper blending but let NeoForge handle depth
-            RenderSystem.enableBlend();
-            RenderSystem.defaultBlendFunc();
-
-            //Set GUI-specific shader
-            RenderSystem.setShader(GameRenderer::getPositionTexShader);
-
             gui.render(mouseX, mouseY, false, partialTicks);
             guiBuffer.endBatch();
             //Not needed, since we can't draw to custom buffers with GUIs.
             //renderBuffers();
 
-            //Render blended elements with proper transparency
-            RenderSystem.blendFuncSeparate(
-                GlStateManager.SourceFactor.SRC_ALPHA,
-                GlStateManager.DestFactor.ONE_MINUS_SRC_ALPHA,
-                GlStateManager.SourceFactor.ONE,
-                GlStateManager.DestFactor.ONE_MINUS_SRC_ALPHA
-            );
+            //Need to use RenderSystem here, since this is a direct buffer.
+            RenderSystem.enableBlend();
             gui.render(mouseX, mouseY, true, partialTicks);
             guiBuffer.endBatch();
             //renderBuffers();
-
-            //Restore render state properly
             RenderSystem.disableBlend();
-            RenderSystem.enableDepthTest();
-            RenderSystem.depthMask(true);
-        
+
             //Render all stacks.  These have to be in the standard GUI reference frame or they won't render.
             matrixStack.scale(1.0F, -1.0F, 1.0F);
 
@@ -751,7 +784,7 @@ public class InterfaceRender implements IInterfaceRender {
                 }
             }
             stacksToRender.clear();
-        
+
             matrixStack.popPose();
         }
         matrixStack.popPose();
