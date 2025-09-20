@@ -243,13 +243,50 @@ public class InterfaceRender implements IInterfaceRender {
             String location = name.substring("/assets/".length() + domain.length() + 1);
             ResourceLocation resourceLocation = ResourceLocation.fromNamespaceAndPath(domain, location);
 
+            // NeoForge 1.21.1: Try multiple resource loading strategies
+            // Strategy 1: Main resource manager with mod resources
             var resource = Minecraft.getInstance().getResourceManager().getResource(resourceLocation);
             if (resource.isPresent()) {
                 return resource.get().open();
-            } else {
-                return null;
             }
+
+            // Strategy 2: Try alternative resource locations for mod-specific resources
+            // For font textures, sometimes they need to be accessed differently in NeoForge 1.21.1
+            ResourceLocation altLocation = ResourceLocation.fromNamespaceAndPath(domain, "textures/mcfont/" +
+                location.substring(location.lastIndexOf('/') + 1));
+            var altResource = Minecraft.getInstance().getResourceManager().getResource(altLocation);
+            if (altResource.isPresent()) {
+                return altResource.get().open();
+            }
+
+            // Strategy 3: Direct mod resource access
+            InterfaceManager.coreInterface.logError("TEXTURE DEBUG: Failed to load " + resourceLocation + ", trying fallback methods");
+            try {
+                InputStream fallbackStream = InterfaceManager.coreInterface.getPackResource(name);
+                if (fallbackStream != null) {
+                    InterfaceManager.coreInterface.logError("TEXTURE DEBUG: Successfully loaded via fallback: " + name);
+                    return fallbackStream;
+                }
+            } catch (Exception fallbackException) {
+                InterfaceManager.coreInterface.logError("TEXTURE DEBUG: Fallback exception for " + name + ": " + fallbackException.getMessage());
+            }
+
+            // Strategy 4: Try loading as class resource
+            try {
+                InputStream classResource = this.getClass().getResourceAsStream(name);
+                if (classResource != null) {
+                    InterfaceManager.coreInterface.logError("TEXTURE DEBUG: Successfully loaded via class resource: " + name);
+                    return classResource;
+                }
+            } catch (Exception classException) {
+                InterfaceManager.coreInterface.logError("TEXTURE DEBUG: Class resource exception for " + name + ": " + classException.getMessage());
+            }
+
+            InterfaceManager.coreInterface.logError("TEXTURE DEBUG: All loading strategies failed for " + name);
+            return null;
+
         } catch (Exception e) {
+            InterfaceManager.coreInterface.logError("TEXTURE DEBUG: Exception loading texture " + name + ": " + e.getMessage());
             return null;
         }
     }
@@ -295,7 +332,8 @@ public class InterfaceRender implements IInterfaceRender {
                     bufferData.isReady = false;
                 }
                 if (!bufferData.isReady) {
-                    // begin() is no longer used - BufferBuilder constructor handles mode and format
+                    // NeoForge 1.21.1: Use Tesselator.getInstance().begin() to get a properly initialized BufferBuilder
+                    BufferBuilder builder = Tesselator.getInstance().begin(VertexFormat.Mode.TRIANGLES, DefaultVertexFormat.NEW_ENTITY);
                     while (data.vertexObject.vertices.hasRemaining()) {
                         //Need to parse these out first since our order differs.
                         float normalX = data.vertexObject.vertices.get();
@@ -306,7 +344,7 @@ public class InterfaceRender implements IInterfaceRender {
                         float posX = data.vertexObject.vertices.get();
                         float posY = data.vertexObject.vertices.get();
                         float posZ = data.vertexObject.vertices.get();
-                        bufferData.builder.addVertex(posX, posY, posZ)
+                        builder.addVertex(posX, posY, posZ)
                             .setColor(data.color.red, data.color.green, data.color.blue, data.alpha)
                             .setUv(texU, texV)
                             .setOverlay(OverlayTexture.NO_OVERLAY)
@@ -315,7 +353,7 @@ public class InterfaceRender implements IInterfaceRender {
                     }
                     bufferData.isReady = true;
                     bufferData.buffer.bind();
-                    bufferData.buffer.upload(bufferData.builder.buildOrThrow());
+                    bufferData.buffer.upload(builder.buildOrThrow());
                     data.vertexObject.vertices.rewind();
                     VertexBuffer.unbind();
                 }
@@ -723,6 +761,16 @@ public class InterfaceRender implements IInterfaceRender {
         matrixStack = mcGUI.pose();
         matrixStack.pushPose();
         renderingGUI = true;
+
+        // NeoForge 1.21.1: Set up proper render state for GUI rendering
+        RenderSystem.enableBlend();
+        RenderSystem.defaultBlendFunc();
+        RenderSystem.disableDepthTest();
+
+        // Reset any problematic render states that might affect GUI rendering
+        RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
+        RenderSystem.clearColor(0.0F, 0.0F, 0.0F, 0.0F);
+
         ByteBufferBuilder byteBufferBuilder = new ByteBufferBuilder(256);
         MultiBufferSource.BufferSource guiBuffer = MultiBufferSource.immediate(byteBufferBuilder);
         renderBuffer = guiBuffer;
@@ -787,6 +835,11 @@ public class InterfaceRender implements IInterfaceRender {
 
             matrixStack.popPose();
         }
+
+        // NeoForge 1.21.1: Restore render state after GUI rendering
+        RenderSystem.enableDepthTest();
+        RenderSystem.disableBlend();
+
         matrixStack.popPose();
         renderingGUI = false;
     }
