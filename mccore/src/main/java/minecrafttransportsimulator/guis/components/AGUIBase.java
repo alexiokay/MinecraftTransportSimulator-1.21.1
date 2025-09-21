@@ -75,6 +75,14 @@ public abstract class AGUIBase {
     }
 
     /**
+     * Checks if the screen size has changed since the last setupComponentsInit call.
+     * Used to detect when GUI repositioning is needed after window resize.
+     */
+    public boolean hasScreenSizeChanged(int currentScreenWidth, int currentScreenHeight) {
+        return this.screenWidth != currentScreenWidth || this.screenHeight != currentScreenHeight;
+    }
+
+    /**
      * Called during init to allow for the creation of GUI components.  All components
      * should be created in this method, and should be added via the appropriate calls.
      * The passed-in guiLeft and guiTop parameters are the top-left of the TEXTURE of

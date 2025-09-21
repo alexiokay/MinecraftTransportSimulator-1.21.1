@@ -811,7 +811,9 @@ public class InterfaceRender implements IInterfaceRender {
         //Render main pass, then blended pass.
         int displayGUIIndex = 0;
         for (AGUIBase gui : AGUIBase.activeGUIs) {
-            if (updateGUIs || gui.components.isEmpty()) {
+            // Check if screen dimensions have changed and force GUI re-initialization
+            boolean screenSizeChanged = gui.hasScreenSizeChanged(screenWidth, screenHeight);
+            if (updateGUIs || gui.components.isEmpty() || screenSizeChanged) {
                 gui.setupComponentsInit(screenWidth, screenHeight);
             }
             matrixStack.pushPose();
