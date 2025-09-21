@@ -7,6 +7,7 @@ import com.mojang.blaze3d.platform.Window;
 import mcinterface1211.mixin.client.CameraMixin;
 import minecrafttransportsimulator.baseclasses.Point3D;
 import minecrafttransportsimulator.baseclasses.RotationMatrix;
+import minecrafttransportsimulator.guis.components.AGUIBase;
 import minecrafttransportsimulator.entities.components.AEntityB_Existing;
 import minecrafttransportsimulator.entities.instances.EntityPlayerGun;
 import minecrafttransportsimulator.entities.instances.PartSeat;
@@ -20,13 +21,14 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.world.entity.player.Player;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.neoforge.client.event.CustomizeGuiOverlayEvent;
-import net.neoforged.neoforge.client.event.RenderArmEvent;
 import net.neoforged.neoforge.client.event.RenderGuiLayerEvent;
+import net.neoforged.neoforge.client.event.RenderArmEvent;
 import net.neoforged.neoforge.client.event.RenderHandEvent;
 import net.neoforged.neoforge.client.event.ViewportEvent.ComputeCameraAngles;
 import net.neoforged.neoforge.client.gui.VanillaGuiLayers;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
+import net.neoforged.neoforge.client.event.ScreenEvent;
 
 /**
  * Interface for handling events pertaining to entity rendering.  This modifies the player's rendered state
@@ -104,22 +106,31 @@ public class InterfaceEventsEntityRendering {
     }
 
     /**
-     * Renders all overlay things.  This is essentially anything that's a 2D render, such as the main overlay,
-     * vehicle HUds, GUIs, camera overlays, etc.
+     * Renders MTS GUI elements using overlay approach.
+     * Modal GUIs use BuilderGUI Screen for proper behavior but rendering is still done here.
+     * HUD elements are rendered when no modal GUI is active.
      */
     @SubscribeEvent
-    public static void onIVRenderOverlayChat(CustomizeGuiOverlayEvent.Chat event) {
-        //Do overlay rendering before the chat window is rendered.
-        //This renders them over the main hotbar, but doesn't block the chat window.
+    public static void onIVRenderGUILayer(RenderGuiLayerEvent.Post event) {
+        // Render MTS GUI elements on the HOTBAR layer (after hotbar is drawn)
+        if (!event.getName().equals(VanillaGuiLayers.HOTBAR)) {
+            return;
+        }
+
         Window window = Minecraft.getInstance().getWindow();
         long displaySize = InterfaceManager.clientInterface.getPackedDisplaySize();
         int screenWidth = (int) (displaySize >> Integer.SIZE);
         int screenHeight = (int) displaySize;
+
+        // NeoForge 1.21.1: Get mouse coordinates for GUI system
         double[] xPos = new double[1];
         double[] yPos = new double[1];
         GLFW.glfwGetCursorPos(window.getWindow(), xPos, yPos);
-        int mouseX = (int) (xPos[0] * screenWidth / window.getScreenWidth());
-        int mouseY = (int) (yPos[0] * screenHeight / window.getScreenHeight());
+
+        // Use GUI scale to convert physical mouse coordinates to GUI coordinates
+        double guiScale = window.getGuiScale();
+        int mouseX = (int) (xPos[0] / guiScale);
+        int mouseY = (int) (yPos[0] / guiScale);
 
         float partialTicks = event.getPartialTick().getGameTimeDeltaPartialTick(false);
         boolean updateGUIs = screenWidth != lastScreenWidth || screenHeight != lastScreenHeight;
@@ -128,8 +139,18 @@ public class InterfaceEventsEntityRendering {
             lastScreenHeight = screenHeight;
         }
 
+        // Mouse input handling is now done through BuilderGUI Screen approach for proper modal behavior
+
+        // Render MTS GUI system using the original MTS rendering pipeline
+        event.getGuiGraphics().pose().pushPose();
+        event.getGuiGraphics().pose().translate(0.0, 0.0, 200.0);
+
+        // Use the MTS rendering system which handles both HUD and modal GUIs correctly
         InterfaceRender.renderGUI(event.getGuiGraphics(), mouseX, mouseY, screenWidth, screenHeight, partialTicks, updateGUIs);
+
+        event.getGuiGraphics().pose().popPose();
     }
+
 
     /**
      * Hand and arm render events.  We use these to disable rendering of the item in the player's hand
@@ -149,5 +170,17 @@ public class InterfaceEventsEntityRendering {
         if ((entity != null && entity.activeGun != null) || CameraSystem.activeCamera != null) {
             event.setCanceled(true);
         }
+    }
+
+    /**
+     * Handle character typing for GUI textboxes when no Screen is active.
+     * This bridges vanilla character input to our custom input handler.
+     *
+     * DISABLED: Replaced with proper Screen/Menu pattern for modal GUIs
+     */
+    // @SubscribeEvent
+    public static void onCharTyped_DISABLED(ScreenEvent.CharacterTyped.Post event) {
+        // This method has been disabled as we now use proper Screen/Menu pattern
+        // Input handling is now done through AbstractContainerScreen
     }
 }

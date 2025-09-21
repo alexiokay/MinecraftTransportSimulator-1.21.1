@@ -100,6 +100,8 @@ public class InterfaceClient implements IInterfaceClient {
 
     @Override
     public boolean isGUIOpen() {
+        // Check for any screen being open, not just BuilderGUI
+        // This ensures pack missing warning and other logic works correctly
         return Minecraft.getInstance().screen != null;
     }
 
@@ -155,6 +157,7 @@ public class InterfaceClient implements IInterfaceClient {
 
     @Override
     public void setActiveGUI(AGUIBase gui) {
+        // Use BuilderGUI Screen approach for proper modal behavior like MTS 1.20.1
         Minecraft.getInstance().setScreen(new BuilderGUI(gui));
     }
 

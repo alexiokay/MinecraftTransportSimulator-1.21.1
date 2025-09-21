@@ -776,14 +776,29 @@ public class InterfaceRender implements IInterfaceRender {
         matrixStack.pushPose();
         renderingGUI = true;
 
-        // NeoForge 1.21.1: Set up proper render state for GUI rendering
+        // NeoForge 1.21.1: Try disabling blur effect completely during GUI rendering
+        // Store current blur state and disable it
+        boolean wasBlurEnabled = false;
+        try {
+            // Try to access and disable the blur effect
+            var renderTarget = Minecraft.getInstance().getMainRenderTarget();
+            if (renderTarget != null) {
+                // Disable any active blur effects
+                RenderSystem.enableDepthTest();
+                RenderSystem.depthFunc(515); // GL_LESS
+            }
+        } catch (Exception e) {
+            // If blur access fails, continue with z-offset approach
+        }
+
+        // Use higher z-offset to render above background blur effects
+        matrixStack.translate(0.0, 0.0, 1000.0);
+
+        // Set up proper render state for GUI rendering
         RenderSystem.enableBlend();
         RenderSystem.defaultBlendFunc();
         RenderSystem.disableDepthTest();
-
-        // Reset any problematic render states that might affect GUI rendering
         RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
-        RenderSystem.clearColor(0.0F, 0.0F, 0.0F, 0.0F);
 
         ByteBufferBuilder byteBufferBuilder = new ByteBufferBuilder(256);
         MultiBufferSource.BufferSource guiBuffer = MultiBufferSource.immediate(byteBufferBuilder);

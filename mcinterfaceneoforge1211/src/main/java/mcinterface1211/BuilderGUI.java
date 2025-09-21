@@ -7,6 +7,7 @@ import minecrafttransportsimulator.guis.components.AGUIComponent;
 import minecrafttransportsimulator.guis.components.GUIComponentTextBox;
 import minecrafttransportsimulator.guis.components.GUIComponentTextBox.TextBoxControlKey;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.resources.sounds.SimpleSoundInstance;
 import net.minecraft.network.chat.Component;
@@ -14,13 +15,14 @@ import net.minecraft.sounds.SoundEvents;
 
 /**
  * Builder for MC GUI classes.  Created when {@link InterfaceClient#setActiveGUI(AGUIBase)}}
- * is called to open a GUI.  This builer is purely to handle input forwarding and game pause
+ * is called to open a GUI.  This builder is purely to handle input forwarding and game pause
  * requests and does no actual rendering as that's left for non-GUI generic rendering code.
+ * Based on MTS 1.20.1 BuilderGUI pattern.
  *
  * @author don_bruce
  */
 public class BuilderGUI extends Screen {
-    private int lastKeycodePresed;
+    private int lastKeycodePressed;
 
     /**
      * Current gui we are built around.
@@ -67,14 +69,14 @@ public class BuilderGUI extends Screen {
     @Override
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
         if (!super.keyPressed(keyCode, scanCode, modifiers)) {
-            lastKeycodePresed = keyCode;
+            lastKeycodePressed = keyCode;
             for (AGUIComponent component : gui.components) {
                 if (component instanceof GUIComponentTextBox) {
                     GUIComponentTextBox textBox = (GUIComponentTextBox) component;
                     if (textBox.focused) {
                         //If we did a paste from the clipboard, we need to replace everything in the box.
                         //Otherwise, just send the char for further processing.
-                        if (isPaste(keyCode)) {
+                        if (isCtrlV(keyCode)) {
                             textBox.setText(Minecraft.getInstance().keyboardHandler.getClipboard());
                         } else {
                             char key = 0;
@@ -116,7 +118,7 @@ public class BuilderGUI extends Screen {
                 if (component instanceof GUIComponentTextBox) {
                     GUIComponentTextBox textBox = (GUIComponentTextBox) component;
                     if (textBox.focused) {
-                        textBox.handleKeyTyped(key, lastKeycodePresed, null);
+                        textBox.handleKeyTyped(key, lastKeycodePressed, null);
                         return true;
                     }
                 }
@@ -140,5 +142,18 @@ public class BuilderGUI extends Screen {
     @Override
     public boolean isPauseScreen() {
         return gui.pauseOnOpen();
+    }
+
+    @Override
+    public void renderBackground(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTicks) {
+        // Don't render background or blur - MTS handles its own rendering through overlay system
+    }
+
+    /**
+     * Checks if the key combination is a paste operation.
+     */
+    private boolean isCtrlV(int keyCode) {
+        return keyCode == GLFW.GLFW_KEY_V && (GLFW.glfwGetKey(Minecraft.getInstance().getWindow().getWindow(), GLFW.GLFW_KEY_LEFT_CONTROL) == GLFW.GLFW_PRESS ||
+                                              GLFW.glfwGetKey(Minecraft.getInstance().getWindow().getWindow(), GLFW.GLFW_KEY_RIGHT_CONTROL) == GLFW.GLFW_PRESS);
     }
 }
