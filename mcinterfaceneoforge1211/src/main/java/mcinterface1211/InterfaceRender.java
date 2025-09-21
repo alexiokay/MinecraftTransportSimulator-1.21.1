@@ -260,29 +260,33 @@ public class InterfaceRender implements IInterfaceRender {
             }
 
             // Strategy 3: Direct mod resource access
-            InterfaceManager.coreInterface.logError("TEXTURE DEBUG: Failed to load " + resourceLocation + ", trying fallback methods");
+            // Check if this is a known missing font file (unicode pages 08, d8-f8 range)
+            boolean isKnownMissingFont = name.contains("unicode_page_08.png") ||
+                                       (name.contains("unicode_page_") &&
+                                        (name.matches(".*unicode_page_[d-f][8-9a-f]\\.png.*")));
+
             try {
                 InputStream fallbackStream = InterfaceManager.coreInterface.getPackResource(name);
                 if (fallbackStream != null) {
-                    InterfaceManager.coreInterface.logError("TEXTURE DEBUG: Successfully loaded via fallback: " + name);
                     return fallbackStream;
                 }
-            } catch (Exception fallbackException) {
-                InterfaceManager.coreInterface.logError("TEXTURE DEBUG: Fallback exception for " + name + ": " + fallbackException.getMessage());
+            } catch (Exception e) {
+                // Fallback failed, continue to class resource
             }
 
             // Strategy 4: Try loading as class resource
             try {
                 InputStream classResource = this.getClass().getResourceAsStream(name);
                 if (classResource != null) {
-                    InterfaceManager.coreInterface.logError("TEXTURE DEBUG: Successfully loaded via class resource: " + name);
                     return classResource;
                 }
-            } catch (Exception classException) {
-                InterfaceManager.coreInterface.logError("TEXTURE DEBUG: Class resource exception for " + name + ": " + classException.getMessage());
+            } catch (Exception e) {
+                // Class resource failed
             }
 
-            InterfaceManager.coreInterface.logError("TEXTURE DEBUG: All loading strategies failed for " + name);
+            if (!isKnownMissingFont) {
+                InterfaceManager.coreInterface.logError("TEXTURE DEBUG: All loading strategies failed for " + name);
+            }
             return null;
 
         } catch (Exception e) {
@@ -729,22 +733,32 @@ public class InterfaceRender implements IInterfaceRender {
                 formattedLocation = "/assets/" + textureLocation.replace(":", "/");
             }
 
-            // Check existence cache first
-            Boolean exists = textureExistenceCache.get(formattedLocation);
-            if (exists == null) {
-                // Only do I/O if not cached
-                exists = InterfaceManager.coreInterface.getPackResource(formattedLocation) != null;
-                textureExistenceCache.put(formattedLocation, exists);
-            }
+            // Special handling for font textures - always try to create ResourceLocation
+            boolean isFontTexture = formattedLocation.contains("/textures/mcfont/");
 
-            if (exists) {
-                //Convert the classpath-location to a domain-location path for MC.
+            if (isFontTexture) {
+                // For font textures, always create ResourceLocation and let the resource system handle missing files
                 String domain = formattedLocation.substring("/assets/".length(), formattedLocation.indexOf("/", "/assets/".length()));
                 String location = formattedLocation.substring("/assets/".length() + domain.length() + 1);
                 result = new RenderStateShard.TextureStateShard(ResourceLocation.fromNamespaceAndPath(domain, location), false, false);
             } else {
-                InterfaceManager.coreInterface.logError("Could not find texture: " + formattedLocation + " Reverting to fallback texture.");
-                result = MISSING_STATE;
+                // For non-font textures, check existence cache first
+                Boolean exists = textureExistenceCache.get(formattedLocation);
+                if (exists == null) {
+                    // Only do I/O if not cached
+                    exists = InterfaceManager.coreInterface.getPackResource(formattedLocation) != null;
+                    textureExistenceCache.put(formattedLocation, exists);
+                }
+
+                if (exists) {
+                    //Convert the classpath-location to a domain-location path for MC.
+                    String domain = formattedLocation.substring("/assets/".length(), formattedLocation.indexOf("/", "/assets/".length()));
+                    String location = formattedLocation.substring("/assets/".length() + domain.length() + 1);
+                    result = new RenderStateShard.TextureStateShard(ResourceLocation.fromNamespaceAndPath(domain, location), false, false);
+                } else {
+                    InterfaceManager.coreInterface.logError("Could not find texture: " + formattedLocation + " Reverting to fallback texture.");
+                    result = MISSING_STATE;
+                }
             }
         }
 
