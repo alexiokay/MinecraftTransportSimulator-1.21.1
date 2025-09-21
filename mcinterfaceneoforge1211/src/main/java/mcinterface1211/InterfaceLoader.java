@@ -25,6 +25,7 @@ import minecrafttransportsimulator.items.components.IItemBlock;
 import minecrafttransportsimulator.items.components.IItemEntityProvider;
 import minecrafttransportsimulator.items.components.IItemFood;
 import minecrafttransportsimulator.items.instances.ItemItem;
+import minecrafttransportsimulator.entities.instances.EntityPlayerGun;
 import minecrafttransportsimulator.jsondefs.JSONPack;
 import minecrafttransportsimulator.mcinterface.IInterfaceCore;
 import minecrafttransportsimulator.mcinterface.InterfaceManager;
@@ -54,6 +55,8 @@ import net.neoforged.neoforge.registries.DeferredRegister;
 import net.neoforged.neoforge.capabilities.RegisterCapabilitiesEvent;
 import net.neoforged.neoforge.capabilities.Capabilities;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
+import net.neoforged.neoforge.client.event.RegisterClientReloadListenersEvent;
+import net.neoforged.neoforge.event.AddPackFindersEvent;
 import net.neoforged.bus.api.SubscribeEvent;
 
 /**
@@ -88,6 +91,7 @@ public class InterfaceLoader {
         modEventBus.addListener(this::onPostConstruction);
         modEventBus.addListener(this::onRegisterCapabilities);
         modEventBus.addListener(this::onRegisterPayloadHandlers);
+        modEventBus.addListener(this::onAddPackFinders);
     }
 
     /**Need to defer init until post-mod construction, as in this version
@@ -254,6 +258,13 @@ public class InterfaceLoader {
         BuilderEntityLinkedSeat.E_TYPE3 = ABuilderEntityBase.ENTITIES.register("builder_seat", () -> EntityType.Builder.<BuilderEntityLinkedSeat>of(BuilderEntityLinkedSeat::new, MobCategory.MISC).sized(0.05F, 0.05F).clientTrackingRange(32 * 16).updateInterval(5).build("builder_seat"));
         BuilderEntityRenderForwarder.E_TYPE4 = ABuilderEntityBase.ENTITIES.register("builder_rendering", () -> EntityType.Builder.<BuilderEntityRenderForwarder>of(BuilderEntityRenderForwarder::new, MobCategory.MISC).sized(0.05F, 0.05F).clientTrackingRange(32 * 16).updateInterval(5).build("builder_rendering"));
 
+        //Register core entities that are not tied to pack items
+        //EntityPlayerGun is a core entity needed for gun functionality
+        BuilderEntityExisting.entityMap.put("EntityPlayerGun", (world, data) -> {
+            return new EntityPlayerGun(world, null, data);
+        });
+        InterfaceManager.coreInterface.logError("ENTITY DEBUG: Registered core entity: EntityPlayerGun");
+
         //Iterate over all pack items and find those that spawn entities.
         //Register these with the IV internal system.
         InterfaceManager.coreInterface.logError("ENTITY DEBUG: Starting entity factory registration process");
@@ -332,5 +343,52 @@ public class InterfaceLoader {
         InterfaceManager.coreInterface.logError("PAYLOAD EVENT: RegisterPayloadHandlersEvent triggered for version: 22.18.0");
         InterfaceManager.coreInterface.logError("PAYLOAD EVENT: Event source: " + event.getClass().getSimpleName());
         InterfacePacket.init(event.registrar("22.18.0"));
+    }
+
+    /**
+     * Register the content pack resource provider with NeoForge's resource system.
+     * This makes content pack resources available to the ResourceManager for GUI texture loading.
+     */
+    @SubscribeEvent
+    public void onAddPackFinders(AddPackFindersEvent event) {
+        if (event.getPackType() == net.minecraft.server.packs.PackType.CLIENT_RESOURCES) {
+            InterfaceManager.coreInterface.logError("RESOURCE PACK: Registering content pack resource provider");
+            event.addRepositorySource((consumer) -> {
+                try {
+                    ContentPackResourceProvider provider = new ContentPackResourceProvider();
+                    net.minecraft.server.packs.PackSelectionConfig selectionConfig =
+                        new net.minecraft.server.packs.PackSelectionConfig(false, net.minecraft.server.packs.repository.Pack.Position.TOP, false);
+
+                    net.minecraft.server.packs.repository.Pack.ResourcesSupplier resourcesSupplier =
+                        new net.minecraft.server.packs.repository.Pack.ResourcesSupplier() {
+                            @Override
+                            public net.minecraft.server.packs.PackResources openPrimary(net.minecraft.server.packs.PackLocationInfo location) {
+                                return provider;
+                            }
+
+                            @Override
+                            public net.minecraft.server.packs.PackResources openFull(net.minecraft.server.packs.PackLocationInfo location, net.minecraft.server.packs.repository.Pack.Metadata metadata) {
+                                return provider;
+                            }
+                        };
+
+                    var pack = net.minecraft.server.packs.repository.Pack.readMetaAndCreate(
+                        provider.location(),
+                        resourcesSupplier,
+                        net.minecraft.server.packs.PackType.CLIENT_RESOURCES,
+                        selectionConfig
+                    );
+
+                    if (pack != null) {
+                        InterfaceManager.coreInterface.logError("RESOURCE PACK: Successfully created content pack resource provider");
+                        consumer.accept(pack);
+                    } else {
+                        InterfaceManager.coreInterface.logError("RESOURCE PACK: Failed to create Pack - readMetaAndCreate returned null");
+                    }
+                } catch (Exception e) {
+                    InterfaceManager.coreInterface.logError("RESOURCE PACK: Exception creating content pack resource provider: " + e.getMessage());
+                }
+            });
+        }
     }
 }

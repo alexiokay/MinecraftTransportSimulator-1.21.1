@@ -1,7 +1,12 @@
 package mcinterface1211;
 import net.minecraft.core.registries.Registries;
 
+import java.io.ByteArrayInputStream;
+import java.io.File;
+import java.io.IOException;
 import java.io.InputStream;
+import java.net.URL;
+import java.net.URLClassLoader;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -9,6 +14,8 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Stream;
+import java.util.jar.JarFile;
+import java.util.zip.ZipEntry;
 
 import minecrafttransportsimulator.items.components.AItemBase;
 import minecrafttransportsimulator.mcinterface.IInterfaceCore;
@@ -22,6 +29,9 @@ import net.minecraft.tags.TagKey;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.client.Minecraft;
+import net.neoforged.api.distmarker.Dist;
+import net.neoforged.fml.loading.FMLEnvironment;
 import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.ModList;
 
@@ -58,11 +68,47 @@ class InterfaceCore implements IInterfaceCore {
         int assetsIndexEnd = resource.indexOf("assets/") + "assets/".length();
         int modIDEnd = resource.indexOf("/", assetsIndexEnd + 1);
         String modID = resource.substring(assetsIndexEnd, modIDEnd);
+
+        // First try using NeoForge 1.21.1 ResourceManager for proper resource loading
+        try {
+            if (FMLEnvironment.dist == Dist.CLIENT) {
+                // On client side, use Minecraft's resource manager for proper asset loading
+                String resourcePath = resource.substring(resource.indexOf("assets/") + "assets/".length());
+                String namespace = resourcePath.substring(0, resourcePath.indexOf("/"));
+                String path = resourcePath.substring(resourcePath.indexOf("/") + 1);
+
+                ResourceLocation location = ResourceLocation.fromNamespaceAndPath(namespace, path);
+                var resourceManager = Minecraft.getInstance().getResourceManager();
+                var resourceOptional = resourceManager.getResource(location);
+                if (resourceOptional.isPresent()) {
+                    return resourceOptional.get().open();
+                }
+            }
+        } catch (Exception e) {
+            // Fall through to legacy loading methods
+        }
+
         Optional<? extends ModContainer> optional = ModList.get().getModContainerById(modID);
         if (optional.isPresent()) {
             // In NeoForge 1.21.1, use the ModContainer's classloader directly for resource access
             ModContainer container = optional.get();
-            // Try to load resource through the mod's classloader
+
+            // For content packs, try loading directly through the ModContainer's classloader
+            if (!modID.equals(InterfaceLoader.MODID)) {
+                try {
+                    // Use the ModContainer's class loader to load resources
+                    // This should work for content pack mods registered with NeoForge
+                    InputStream stream = container.getClass().getClassLoader().getResourceAsStream(resource);
+                    if (stream != null) {
+                        InterfaceManager.coreInterface.logError("RESOURCE DEBUG: Loaded resource from mod container: " + modID + " - " + resource);
+                        return stream;
+                    }
+                } catch (Exception e) {
+                    InterfaceManager.coreInterface.logError("RESOURCE DEBUG: Failed to load from mod container: " + modID + " - " + e.getMessage());
+                }
+            }
+
+            // Original loading methods as fallback
             try {
                 // First try loading through the container's mod instance if available
                 Class<?> modClass = Class.forName(container.getModInfo().getModId() + "." + container.getModInfo().getDisplayName().replaceAll("\\s+", ""));
@@ -79,9 +125,55 @@ class InterfaceCore implements IInterfaceCore {
                 //This requires us to check a class of that jar vs the mod jar for the resource.
                 return InterfaceManager.class.getResourceAsStream(resource);
             }
+        } else {
+            // Check for external content packs in the mods directory
+            InputStream packStream = loadResourceFromContentPacks(resource, modID);
+            if (packStream != null) {
+                return packStream;
+            }
         }
         //Try to get a Minecraft texture, we use the classloader of the block class, since it's common to servers and clients.
         return Blocks.AIR.getClass().getResourceAsStream(resource);
+    }
+
+    /**
+     * Loads resources from external content pack JARs.
+     * This handles content packs that are not registered as mods but placed in the mods directory.
+     */
+    private InputStream loadResourceFromContentPacks(String resource, String modID) {
+        try {
+            // Get the mods directory - this works for both dev and production environments
+            File modsDir = new File("run/mods");
+            if (!modsDir.exists()) {
+                // Fallback for different directory structures
+                modsDir = new File("mods");
+            }
+
+            if (modsDir.exists() && modsDir.isDirectory()) {
+                // Look for JAR files that might contain the modID
+                for (File file : modsDir.listFiles()) {
+                    if (file.isFile() && file.getName().toLowerCase().endsWith(".jar")) {
+                        try (JarFile jarFile = new JarFile(file)) {
+                            // Check if this JAR contains resources for our modID
+                            ZipEntry entry = jarFile.getEntry(resource);
+                            if (entry != null) {
+                                InterfaceLoader.LOGGER.info("MTS: Found resource {} in content pack {}", resource, file.getName());
+                                // Read the data into memory to avoid closed JarFile issues
+                                try (InputStream entryStream = jarFile.getInputStream(entry)) {
+                                    byte[] data = entryStream.readAllBytes();
+                                    return new ByteArrayInputStream(data);
+                                }
+                            }
+                        } catch (IOException e) {
+                            InterfaceLoader.LOGGER.warn("MTS: Failed to read content pack {}: {}", file.getName(), e.getMessage());
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            InterfaceLoader.LOGGER.error("MTS: Error loading resource {} from content packs: {}", resource, e.getMessage());
+        }
+        return null;
     }
 
     @Override
