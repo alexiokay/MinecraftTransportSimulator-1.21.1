@@ -15,9 +15,12 @@ import minecrafttransportsimulator.systems.ConfigSystem;
 import net.minecraft.client.model.HumanoidModel;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Mixin(HumanoidModel.class)
 public abstract class HumanoidModelMixin<T extends LivingEntity> {
+    private static final Logger LOGGER = LoggerFactory.getLogger(HumanoidModelMixin.class);
     private static final float yArmAngleRad = (float) Math.toRadians(10);
 
     /**
@@ -26,10 +29,20 @@ public abstract class HumanoidModelMixin<T extends LivingEntity> {
     @SuppressWarnings("unchecked")
     @Inject(method = "setupAnim", at = @At(value = "TAIL"))
     public void inject_setupAnim(T entity, float limbSwing, float limbSwingAmount, float ageInTicks, float netHeadYaw, float headPitch, CallbackInfo ci) {
-        if (ConfigSystem.client.renderingSettings.playerTweaks.value) {
+        if (entity instanceof Player) {
+            LOGGER.error("DEBUG: HumanoidModelMixin setupAnim called for player: {}", ((Player) entity).getName().getString());
+            LOGGER.error("DEBUG: playerTweaks setting is: {}", ConfigSystem.client.renderingSettings.playerTweaks.value);
+        }
+
+        // ALWAYS apply animations regardless of setting for testing
+        if (true || ConfigSystem.client.renderingSettings.playerTweaks.value) {
             HumanoidModel<T> model = (HumanoidModel<T>) ((Object) this);
             WrapperEntity entityWrapper = WrapperEntity.getWrapperFor(entity);
             AEntityB_Existing ridingEntity = entityWrapper.getEntityRiding();
+
+            if (entity instanceof Player && ridingEntity != null) {
+                LOGGER.error("DEBUG: HumanoidModelMixin player {} is riding: {}", ((Player) entity).getName().getString(), ridingEntity.getClass().getSimpleName());
+            }
 
             //This may be null if MC sets this player as riding before the actual entity has time to load NBT.
             if (ridingEntity != null) {
@@ -40,6 +53,9 @@ public abstract class HumanoidModelMixin<T extends LivingEntity> {
 
                     if (seat.vehicleOn != null && seat.placementDefinition.isController) {
                         double turningAngle = seat.vehicleOn.rudderInputVar.currentValue / 2D;
+                        LOGGER.error("DEBUG: STEERING ANIMATION - turningAngle: {}, rightArm old: {}, leftArm old: {}",
+                            turningAngle, model.rightArm.xRot, model.leftArm.xRot);
+
                         model.rightArm.xRot = (float) Math.toRadians(-75 + turningAngle);
                         model.rightArm.yRot = -yArmAngleRad;
                         model.rightArm.zRot = 0;
@@ -47,6 +63,9 @@ public abstract class HumanoidModelMixin<T extends LivingEntity> {
                         model.leftArm.xRot = (float) Math.toRadians(-75 - turningAngle);
                         model.leftArm.yRot = yArmAngleRad;
                         model.leftArm.zRot = 0;
+
+                        LOGGER.error("DEBUG: STEERING ANIMATION - Applied rightArm: {}, leftArm: {}",
+                            model.rightArm.xRot, model.leftArm.xRot);
                     }
                 }
                 if (renderCurrentRiderStanding) {

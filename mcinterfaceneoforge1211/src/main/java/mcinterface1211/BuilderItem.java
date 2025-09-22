@@ -6,6 +6,7 @@ import net.minecraft.core.component.DataComponents;
 import net.minecraft.resources.ResourceLocation;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -63,6 +64,11 @@ import net.neoforged.neoforge.registries.DeferredRegister;
  */
 public class BuilderItem extends Item implements IBuilderItemInterface {
     protected static final DeferredRegister<Item> ITEMS = DeferredRegister.create(Registries.ITEM, InterfaceLoader.MODID);
+
+    /**
+     * Map of pack namespace registers for content pack items.
+     **/
+    protected static final Map<String, DeferredRegister<Item>> packRegisters = new HashMap<>();
 
     /**
      * Map of created items linked to their builder instances.  Used for interface operations.
@@ -265,5 +271,21 @@ public class BuilderItem extends Item implements IBuilderItemInterface {
     @Override
     public boolean canAttackBlock(BlockState state, Level world, BlockPos pos, Player player) {
         return item.canBreakBlocks();
+    }
+
+    /**
+     * Gets or creates a DeferredRegister for the specified pack namespace.
+     */
+    public static DeferredRegister<Item> getOrCreatePackRegister(String packNamespace) {
+        return packRegisters.computeIfAbsent(packNamespace, namespace ->
+            DeferredRegister.create(Registries.ITEM, namespace)
+        );
+    }
+
+    /**
+     * Registers all pack registers with the mod event bus.
+     */
+    public static void registerPackRegisters(net.neoforged.bus.api.IEventBus modEventBus) {
+        packRegisters.values().forEach(register -> register.register(modEventBus));
     }
 }

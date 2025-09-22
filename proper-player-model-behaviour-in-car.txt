@@ -1,0 +1,39 @@
+PROPER PLAYER MODEL BEHAVIOR IN VEHICLES - MTS MOD
+
+The player model should exhibit the following behavior when seated in a vehicle:
+
+1. STABLE SITTING POSITION:
+   - Player model should remain still and not move/rotate with mouse input
+   - Model should maintain a proper sitting pose with legs positioned correctly
+   - Body should not sway or move based on camera movement
+
+2. HEAD/BODY CONTROL:
+   - Player's head should NOT follow mouse movement when seated ( just 90 - 80 degrees max left and right)
+   - Unlike normal gameplay, head rotation should be independent of mouse input
+   - Body orientation should remain fixed relative to the vehicle seat
+
+3. STEERING WHEEL ANIMATIONS:
+   - When pressing A key (turn left): Left arm should rotate to show steering wheel turning left
+   - When pressing D key (turn right): Right arm should rotate to show steering wheel turning right
+   - Arms should return to neutral position when no steering input is active
+   - Animation should be smooth and responsive to input
+
+4. LEG POSITIONING:
+   - Legs should be bent at approximately 90 degrees for sitting position
+   - Feet should be positioned as if resting on pedals
+   - Leg position should remain stable regardless of camera movement
+
+5. OVERALL IMMERSION:
+   - The player should appear to be actually driving the vehicle
+   - All body parts should move in a realistic driving manner
+   - No floating or disconnected limb movements
+   - Smooth transitions between different driving states
+
+TECHNICAL IMPLEMENTATION:
+- Use PlayerAnimator mod instead of broken Mixin system
+- Apply steering animations based on vehicle rudderInputVar.currentValue
+- Override default player model behavior when seated in controller seats
+- Maintain compatibility with other animation mods like First Person Model
+
+This behavior was working in previous versions but broke in NeoForge 1.21.1 port.
+Current issue: Player model moves with mouse and lacks steering animations.

@@ -299,6 +299,60 @@ public class InterfaceRender implements IInterfaceRender {
     public void renderItemModel(GUIComponentItem component) {
         stacksToRender.add(component);
     }
+
+    /**
+     * Check if an ItemStack represents a pack item that needs custom rendering.
+     */
+    private static boolean isPackItem(net.minecraft.world.item.ItemStack stack) {
+        if (stack.getItem() instanceof BuilderItem) {
+            BuilderItem builderItem = (BuilderItem) stack.getItem();
+            boolean isPackItem = builderItem.getWrappedItem() instanceof minecrafttransportsimulator.items.components.AItemPack;
+            InterfaceManager.coreInterface.logError("PACK ITEM CHECK: " + stack.getItem().getClass().getSimpleName() + " -> " + isPackItem);
+            return isPackItem;
+        }
+        InterfaceManager.coreInterface.logError("PACK ITEM CHECK: " + stack.getItem().getClass().getSimpleName() + " -> NOT BuilderItem");
+        return false;
+    }
+
+    /**
+     * Render a simple placeholder for pack items instead of the broken model.
+     */
+    private static void renderPackItemPlaceholder(GuiGraphics mcGUI, GUIComponentItem component) {
+        InterfaceManager.coreInterface.logError("PLACEHOLDER RENDER: Rendering pack item placeholder (unscaled)");
+        // For now, render a simple colored rectangle as a placeholder
+        // In the future, this could be enhanced to render the actual item texture or a 3D model
+        int x = (int) component.translation.x;
+        int y = (int) -component.translation.y;
+        int size = 16; // Standard item size
+
+        // Draw a simple colored rectangle
+        mcGUI.fill(x, y, x + size, y + size, 0xFF888888); // Gray placeholder
+
+        // Draw a border
+        mcGUI.fill(x, y, x + size, y + 1, 0xFF000000); // Top
+        mcGUI.fill(x, y + size - 1, x + size, y + size, 0xFF000000); // Bottom
+        mcGUI.fill(x, y, x + 1, y + size, 0xFF000000); // Left
+        mcGUI.fill(x + size - 1, y, x + size, y + size, 0xFF000000); // Right
+    }
+
+    /**
+     * Render a simple placeholder for pack items (scaled version).
+     */
+    private static void renderPackItemPlaceholderScaled(GuiGraphics mcGUI, GUIComponentItem component) {
+        InterfaceManager.coreInterface.logError("PLACEHOLDER RENDER: Rendering pack item placeholder (scaled)");
+        int x = (int) (component.translation.x / component.scale);
+        int y = (int) (-component.translation.y / component.scale) + 1;
+        int size = 16; // Standard item size
+
+        // Draw a simple colored rectangle
+        mcGUI.fill(x, y, x + size, y + size, 0xFF888888); // Gray placeholder
+
+        // Draw a border
+        mcGUI.fill(x, y, x + size, y + 1, 0xFF000000); // Top
+        mcGUI.fill(x, y + size - 1, x + size, y + size, 0xFF000000); // Bottom
+        mcGUI.fill(x, y, x + 1, y + size, 0xFF000000); // Left
+        mcGUI.fill(x + size - 1, y, x + size, y + size, 0xFF000000); // Right
+    }
     
     @Override
     public void renderVertices(RenderableData data, boolean changedSinceLastRender) {
@@ -853,10 +907,20 @@ public class InterfaceRender implements IInterfaceRender {
                     if (component.scale != 1.0) {
                         posestack.scale(component.scale, component.scale, 1.0F);
                         RenderSystem.applyModelViewMatrix();
-                        mcGUI.renderItem(((WrapperItemStack) component.stackToRender).stack, (int) (component.translation.x / component.scale), (int) (-component.translation.y / component.scale) + 1);
+                        // Check if this is a pack item and render a simple placeholder instead of the broken model
+                        if (isPackItem(((WrapperItemStack) component.stackToRender).stack)) {
+                            renderPackItemPlaceholderScaled(mcGUI, component);
+                        } else {
+                            mcGUI.renderItem(((WrapperItemStack) component.stackToRender).stack, (int) (component.translation.x / component.scale), (int) (-component.translation.y / component.scale) + 1);
+                        }
                     } else {
                         RenderSystem.applyModelViewMatrix();
-                        mcGUI.renderItem(((WrapperItemStack) component.stackToRender).stack, (int) component.translation.x, (int) -component.translation.y);
+                        // Check if this is a pack item and render a simple placeholder instead of the broken model
+                        if (isPackItem(((WrapperItemStack) component.stackToRender).stack)) {
+                            renderPackItemPlaceholder(mcGUI, component);
+                        } else {
+                            mcGUI.renderItem(((WrapperItemStack) component.stackToRender).stack, (int) component.translation.x, (int) -component.translation.y);
+                        }
                     }
                     posestack.popPose();
                     RenderSystem.applyModelViewMatrix();

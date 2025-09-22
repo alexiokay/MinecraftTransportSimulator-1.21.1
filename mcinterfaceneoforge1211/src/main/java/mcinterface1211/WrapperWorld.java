@@ -15,7 +15,6 @@ import java.util.UUID;
 
 import com.google.common.collect.Streams;
 
-import mcinterface1211.mixin.common.BiomeMixin;
 import mcinterface1211.mixin.common.ConcretePowderBlockMixin;
 import mcinterface1211.mixin.common.DimensionDataStorageMixin;
 import net.minecraft.world.level.storage.DimensionDataStorage;
@@ -784,7 +783,7 @@ public class WrapperWorld extends AWrapperWorld {
     @Override
     public float getTemperature(Point3D position) {
         BlockPos pos = BlockPos.containing(position.x, position.y, position.z);
-        return ((BiomeMixin) ((Object) world.getBiome(pos).value())).invoke_getTemperature(pos);
+        return world.getBiome(pos).value().getTemperature(pos);
     }
 
     @Override

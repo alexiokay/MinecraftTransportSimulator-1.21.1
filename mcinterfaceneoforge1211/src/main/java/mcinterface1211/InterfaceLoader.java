@@ -161,8 +161,31 @@ public class InterfaceLoader {
         for (String packID : PackParser.getAllPackIDs()) {
             for (AItemPack<?> item : PackParser.getAllItemsForPack(packID, true)) {
                 if (item.autoGenerate()) {
-                    //Crate the item registry creator.
-                    BuilderItem.ITEMS.register(item.getRegistrationName(), () -> {
+                    //Use the item's pack ID to determine the correct namespace
+                    String itemPackID = item.definition.packID;
+                    String registrationName = item.getRegistrationName();
+
+                    //Get the appropriate register for this namespace
+                    DeferredRegister<Item> register;
+                    String itemName;
+
+                    if (itemPackID.equals(InterfaceLoader.MODID)) {
+                        // MTS core items - register in mts namespace
+                        register = BuilderItem.ITEMS;
+                        itemName = registrationName;
+                    } else {
+                        // Content pack items - register in pack namespace
+                        register = BuilderItem.getOrCreatePackRegister(itemPackID);
+                        // Remove pack prefix from registration name if present
+                        if (registrationName.startsWith(itemPackID + ".")) {
+                            itemName = registrationName.substring(itemPackID.length() + 1);
+                        } else {
+                            itemName = registrationName;
+                        }
+                    }
+
+                    //Register the item in the correct namespace
+                    register.register(itemName, () -> {
                         Item.Properties itemProperties = new Item.Properties();
                         itemProperties.stacksTo(item.getStackSize());
                         if (item instanceof ItemItem && ((ItemItem) item).definition.food != null) {
@@ -215,6 +238,9 @@ public class InterfaceLoader {
                 }
             }
         }
+
+        //Register all pack-specific DeferredRegisters
+        BuilderItem.registerPackRegisters(modEventBus);
 
         //Create creative tabs, as required.
         creativeTabsRequired.forEach((tabID, tabItems) -> {
@@ -353,7 +379,7 @@ public class InterfaceLoader {
     public void onAddPackFinders(AddPackFindersEvent event) {
         if (event.getPackType() == net.minecraft.server.packs.PackType.CLIENT_RESOURCES) {
             InterfaceManager.coreInterface.logError("RESOURCE PACK: Registering content pack resource provider");
-            event.addRepositorySource((consumer) -> {
+            event.addRepositorySource(consumer -> {
                 try {
                     ContentPackResourceProvider provider = new ContentPackResourceProvider();
                     net.minecraft.server.packs.PackSelectionConfig selectionConfig =

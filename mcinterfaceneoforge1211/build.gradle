@@ -20,6 +20,11 @@ repositories {
     mavenCentral()
     // JEI maven
     maven { url = "https://maven.blamejared.com/" }
+    // PlayerAnimator maven (KosmX's official repository)
+    maven {
+        name "KosmX's maven"
+        url 'https://maven.kosmx.dev/'
+    }
 }
 
 //Configuration that holds jars to include in the jar
@@ -32,6 +37,11 @@ configurations {
 //NeoForge configuration
 neoForge {
     version = project.neoforge_version
+
+    // Access Transformers configuration
+    accessTransformers {
+        file 'src/main/resources/META-INF/accesstransformer.cfg'
+    }
 
     runs {
         client {
@@ -81,6 +91,9 @@ dependencies {
 
     //JEI API
     compileOnly "mezz.jei:jei-1.21.1-neoforge:19.22.1.316"
+
+    //PlayerAnimator API for player model animations - DISABLED due to conflicts
+    //implementation "dev.kosmx.player-anim:player-animation-lib-forge:2.0.1+1.21.1"
     runtimeOnly "mezz.jei:jei-1.21.1-neoforge:19.22.1.316"
 }
 

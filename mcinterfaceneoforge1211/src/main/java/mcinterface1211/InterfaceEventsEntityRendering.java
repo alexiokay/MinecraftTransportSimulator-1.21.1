@@ -4,7 +4,6 @@ import org.lwjgl.glfw.GLFW;
 
 import com.mojang.blaze3d.platform.Window;
 
-import mcinterface1211.mixin.client.CameraMixin;
 import minecrafttransportsimulator.baseclasses.Point3D;
 import minecrafttransportsimulator.baseclasses.RotationMatrix;
 import minecrafttransportsimulator.guis.components.AGUIBase;
@@ -77,7 +76,16 @@ public class InterfaceEventsEntityRendering {
                 //Move the info's setup to the set position of the camera.
                 //This will offset the player's eye position to match the camera.
                 //We do this in first-person mode since third-person adds zoom stuff.
-                ((CameraMixin) camera).invoke_setPosition(cameraAdjustedPosition.x, cameraAdjustedPosition.y, cameraAdjustedPosition.z);
+                // Use reflection to call setPosition for proper camera behavior
+                // This works around NeoForge's module system restrictions on Mixins
+                try {
+                    java.lang.reflect.Method setPositionMethod = camera.getClass().getDeclaredMethod("setPosition", double.class, double.class, double.class);
+                    setPositionMethod.setAccessible(true);
+                    setPositionMethod.invoke(camera, cameraAdjustedPosition.x, cameraAdjustedPosition.y, cameraAdjustedPosition.z);
+                } catch (Exception e) {
+                    // Fallback to Access Transformer method if reflection fails
+                    camera.setPosition(cameraAdjustedPosition.x, cameraAdjustedPosition.y, cameraAdjustedPosition.z);
+                }
                 adjustedCamera = true;
             }
         }
