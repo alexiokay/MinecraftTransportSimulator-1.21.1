@@ -204,7 +204,9 @@ public class InterfaceRender implements IInterfaceRender {
                     //Set the stack variables and render.
                     matrixStack = stack;
                     renderBuffer = buffer;
+                    // Render both solid and translucent passes to ensure lights and particles show
                     doRenderCall(false, partialTicks);
+                    doRenderCall(true, partialTicks);
                 }
             }
         });
@@ -406,7 +408,7 @@ public class InterfaceRender implements IInterfaceRender {
                             .setColor(data.color.red, data.color.green, data.color.blue, data.alpha)
                             .setUv(texU, texV)
                             .setOverlay(OverlayTexture.NO_OVERLAY)
-                            .setLight(data.worldLightValue)
+                            .setLight(data.lightingMode.disableWorldLighting ? LightTexture.FULL_BRIGHT : data.worldLightValue)
                             .setNormal(normalX, normalY, normalZ);
                     }
                     bufferData.isReady = true;
@@ -445,8 +447,10 @@ public class InterfaceRender implements IInterfaceRender {
                     buffer.setColor(data.color.red, data.color.green, data.color.blue, data.alpha);
                     buffer.setUv(texU, texV);
                     buffer.setOverlay(OverlayTexture.NO_OVERLAY);
-                    // setUv2 now takes sky and block light values separately in MC 1.21.1
-                    buffer.setUv2(data.worldLightValue, data.worldLightValue);
+                    // In NeoForge 1.21.1, use setLight instead of setUv2 for proper lighting
+                    // Use full bright for entities that should ignore lighting (particles, lights, etc)
+                    int lightValue = data.lightingMode.disableWorldLighting ? LightTexture.FULL_BRIGHT : data.worldLightValue;
+                    buffer.setLight(lightValue);
                     // Transform normal vector using the normal matrix
                     org.joml.Vector3f normalVec = new org.joml.Vector3f(normalX, normalY, normalZ).mul(stackEntry.normal());
                     buffer.setNormal(normalVec.x, normalVec.y, normalVec.z);
@@ -703,7 +707,13 @@ public class InterfaceRender implements IInterfaceRender {
     @Override
     public int getLightingAtPosition(Point3D position) {
         BlockPos pos = BlockPos.containing(position.x, position.y, position.z);
-        return LightTexture.pack(Minecraft.getInstance().level.getBrightness(LightLayer.BLOCK, pos), Minecraft.getInstance().level.getBrightness(LightLayer.SKY, pos));
+        int blockLight = Minecraft.getInstance().level.getBrightness(LightLayer.BLOCK, pos);
+        int skyLight = Minecraft.getInstance().level.getBrightness(LightLayer.SKY, pos);
+        // Ensure we have reasonable light values - use max of world light or a minimum
+        // This prevents completely black rendering while still allowing light variation
+        blockLight = Math.max(blockLight, 7);  // Minimum block light
+        skyLight = Math.max(skyLight, 7);      // Minimum sky light
+        return LightTexture.pack(blockLight, skyLight);
     }
 
     @Override

@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "Read(//c/Users/alexispace/Desktop/webdev/minecraft/MTSOfficialPack-1.21.1/**)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Read(//c/Users/alexispace/Desktop/webdev/minecraft/old/MinecraftTransportSimulator/mcinterfaceforge1201/src/main/java/mcinterface1201/**)"
     ],
     "deny": [],
     "ask": []
