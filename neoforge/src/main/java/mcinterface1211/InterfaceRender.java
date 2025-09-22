@@ -707,13 +707,7 @@ public class InterfaceRender implements IInterfaceRender {
     @Override
     public int getLightingAtPosition(Point3D position) {
         BlockPos pos = BlockPos.containing(position.x, position.y, position.z);
-        int blockLight = Minecraft.getInstance().level.getBrightness(LightLayer.BLOCK, pos);
-        int skyLight = Minecraft.getInstance().level.getBrightness(LightLayer.SKY, pos);
-        // Ensure we have reasonable light values - use max of world light or a minimum
-        // This prevents completely black rendering while still allowing light variation
-        blockLight = Math.max(blockLight, 7);  // Minimum block light
-        skyLight = Math.max(skyLight, 7);      // Minimum sky light
-        return LightTexture.pack(blockLight, skyLight);
+        return LightTexture.pack(Minecraft.getInstance().level.getBrightness(LightLayer.BLOCK, pos), Minecraft.getInstance().level.getBrightness(LightLayer.SKY, pos));
     }
 
     @Override
