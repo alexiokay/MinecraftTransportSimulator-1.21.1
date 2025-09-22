@@ -61,20 +61,9 @@ public class InterfaceEventsModelLoader {
 
                     String namespace, itemName;
 
-                    if (itemPackID.equals(InterfaceLoader.MODID)) {
-                        // MTS core items - register in mts namespace
-                        namespace = InterfaceLoader.MODID;
-                        itemName = registrationName;
-                    } else {
-                        // Content pack items - register in pack namespace
-                        namespace = itemPackID;
-                        // Remove pack prefix from registration name if present
-                        if (registrationName.startsWith(itemPackID + ".")) {
-                            itemName = registrationName.substring(itemPackID.length() + 1);
-                        } else {
-                            itemName = registrationName;
-                        }
-                    }
+                    // All models register in MTS namespace
+                    namespace = InterfaceLoader.MODID;
+                    itemName = registrationName;
 
                     // Register the standalone model for this item in the correct namespace
                     ModelResourceLocation modelLocation = ModelResourceLocation.standalone(
@@ -98,21 +87,20 @@ public class InterfaceEventsModelLoader {
      */
     public static class PackResourcePack implements PackResources {
         private final Set<String> domains;
-        private final Set<String> fakeDomains;
+        private final Set<String> mtsNamespace;
         private final Map<String, String> generatedModels;
 
         private PackResourcePack() {
             super();
             domains = new HashSet<>();
-            fakeDomains = new HashSet<>();
+            mtsNamespace = new HashSet<>();
             generatedModels = new HashMap<>();
-            fakeDomains.add(InterfaceLoader.MODID);
+            mtsNamespace.add(InterfaceLoader.MODID);
         }
 
         @Override
         public IoSupplier<InputStream> getResource(PackType type, ResourceLocation location) {
-            // Add debug logging to see what's being requested
-            InterfaceManager.coreInterface.logError("PACK RESOURCE REQUEST: " + type + " -> " + location);
+            // Debug logging removed to reduce spam
 
             //First check if we should even process this resource.
             // Handle both pack namespaces and the MTS namespace for JSON models
@@ -153,53 +141,13 @@ public class InterfaceEventsModelLoader {
         }
 
         /**
-         * Handles item model requests by redirecting to the correct content pack namespace
-         * or generating fallback models if none exist.
+         * Handles item model requests for MTS namespace models.
+         * All models are now in assets/mts/models/item/ with format: packID.itemName.json
          */
         private IoSupplier<InputStream> handleItemModelRequest(ResourceLocation location) {
             String path = location.getPath();
-            String namespace = location.getNamespace();
 
-            // For content pack namespaces, look for models directly using the item name
-            if (!namespace.equals(InterfaceLoader.MODID) && domains.contains(namespace)) {
-                // Extract item name from path like "models/item/enginequad.json"
-                if (path.contains("models/item/") && path.endsWith(".json")) {
-                    String itemPath = path.substring(path.indexOf("models/item/") + 12); // Remove "models/item/"
-                    String itemName = itemPath.substring(0, itemPath.length() - 5); // Remove ".json"
-
-                    if (ConfigSystem.settings.general.devMode.value) {
-                        InterfaceManager.coreInterface.logError("CONTENT PACK MODEL REQUEST: " + namespace + ":" + itemName);
-                    }
-
-                    // Try to find existing model in various locations within the content pack
-                    String[] possiblePaths = {
-                        "/assets/" + namespace + "/models/item/" + itemName + ".json",
-                        "/assets/" + namespace + "/models/item/parts/" + itemName + ".json",
-                        "/assets/" + namespace + "/models/item/items/" + itemName + ".json",
-                        "/assets/" + namespace + "/models/item/vehicles/" + itemName + ".json",
-                        "/assets/" + namespace + "/models/item/decors/" + itemName + ".json"
-                    };
-
-                    for (String possiblePath : possiblePaths) {
-                        InputStream stream = InterfaceManager.coreInterface.getPackResource(possiblePath);
-                        if (stream != null) {
-                            if (ConfigSystem.settings.general.devMode.value) {
-                                InterfaceManager.coreInterface.logError("CONTENT PACK MODEL SUCCESS: Found model at " + possiblePath);
-                            }
-                            final InputStream streamForSupplier = stream;
-                            return () -> streamForSupplier;
-                        }
-                    }
-
-                    // If no model found, generate a fallback
-                    if (ConfigSystem.settings.general.devMode.value) {
-                        InterfaceManager.coreInterface.logError("CONTENT PACK MODEL: No existing model found, generating fallback for " + namespace + ":" + itemName);
-                    }
-                    return generateItemModel(location, namespace, itemName);
-                }
-            }
-
-            // Handle legacy MTS namespace requests (old format like "mtsofficialpack.itemname")
+            // Handle MTS namespace requests (format like "mtsofficialpack.itemname")
             if (path.contains("models/item/") && path.contains(".")) {
                 String itemPath = path.substring(path.indexOf("models/item/") + 12); // Remove "models/item/"
                 if (itemPath.endsWith(".json")) {
@@ -211,44 +159,11 @@ public class InterfaceEventsModelLoader {
                         String itemName = parts[1];
 
                         if (ConfigSystem.settings.general.devMode.value) {
-                            InterfaceManager.coreInterface.logError("LEGACY MODEL REDIRECT: Looking for " + packID + ":" + itemName);
+                            InterfaceManager.coreInterface.logError("MODEL REQUEST: " + packID + ":" + itemName);
                         }
 
-                        // First try to find existing model in the content pack namespace
-                        String redirectedPath = "/assets/" + packID + "/models/item/" + itemName + ".json";
-                        InputStream stream = InterfaceManager.coreInterface.getPackResource(redirectedPath);
-
-                        if (stream != null) {
-                            if (ConfigSystem.settings.general.devMode.value) {
-                                InterfaceManager.coreInterface.logError("LEGACY MODEL REDIRECT SUCCESS: Found model at " + redirectedPath);
-                            }
-                            final InputStream streamForSupplier = stream;
-                            return () -> streamForSupplier;
-                        }
-
-                        // If no existing model, try other common locations
-                        String[] possiblePaths = {
-                            "/assets/" + packID + "/models/item/items/" + itemName + ".json",
-                            "/assets/" + packID + "/models/item/parts/" + itemName + ".json",
-                            "/assets/" + packID + "/models/item/vehicles/" + itemName + ".json",
-                            "/assets/" + packID + "/models/item/decors/" + itemName + ".json"
-                        };
-
-                        for (String possiblePath : possiblePaths) {
-                            stream = InterfaceManager.coreInterface.getPackResource(possiblePath);
-                            if (stream != null) {
-                                if (ConfigSystem.settings.general.devMode.value) {
-                                    InterfaceManager.coreInterface.logError("LEGACY MODEL REDIRECT SUCCESS: Found model at " + possiblePath);
-                                }
-                                final InputStream streamForSupplier = stream;
-                                return () -> streamForSupplier;
-                            }
-                        }
-
-                        // If no model found, generate a fallback
-                        if (ConfigSystem.settings.general.devMode.value) {
-                            InterfaceManager.coreInterface.logError("LEGACY MODEL REDIRECT: No existing model found, generating fallback for " + packID + ":" + itemName);
-                        }
+                        // Models are directly loaded from jar/filesystem, no redirect needed
+                        // Just generate a fallback if the model doesn't exist
                         return generateItemModel(location, packID, itemName);
                     }
                 }
@@ -363,9 +278,9 @@ public class InterfaceEventsModelLoader {
 
         @Override
         public Set<String> getNamespaces(PackType pType) {
-            // Return both fake domains and all pack domains to ensure we handle all requests
+            // Return MTS namespace and pack domains for resource handling
             Set<String> allNamespaces = new HashSet<>();
-            allNamespaces.addAll(fakeDomains);
+            allNamespaces.addAll(mtsNamespace);
             allNamespaces.addAll(domains);
             return allNamespaces;
         }

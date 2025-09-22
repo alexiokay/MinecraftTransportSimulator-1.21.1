@@ -169,20 +169,10 @@ public class InterfaceLoader {
                     DeferredRegister<Item> register;
                     String itemName;
 
-                    if (itemPackID.equals(InterfaceLoader.MODID)) {
-                        // MTS core items - register in mts namespace
-                        register = BuilderItem.ITEMS;
-                        itemName = registrationName;
-                    } else {
-                        // Content pack items - register in pack namespace
-                        register = BuilderItem.getOrCreatePackRegister(itemPackID);
-                        // Remove pack prefix from registration name if present
-                        if (registrationName.startsWith(itemPackID + ".")) {
-                            itemName = registrationName.substring(itemPackID.length() + 1);
-                        } else {
-                            itemName = registrationName;
-                        }
-                    }
+                    // REVERTED: Use old namespace system compatible with PackCompiler
+                    // All items register in MTS namespace for PackCompiler compatibility
+                    register = BuilderItem.ITEMS;
+                    itemName = registrationName;
 
                     //Register the item in the correct namespace
                     register.register(itemName, () -> {
@@ -239,8 +229,7 @@ public class InterfaceLoader {
             }
         }
 
-        //Register all pack-specific DeferredRegisters
-        BuilderItem.registerPackRegisters(modEventBus);
+        //REVERTED: No longer using pack-specific registers, all items in MTS namespace
 
         //Create creative tabs, as required.
         creativeTabsRequired.forEach((tabID, tabItems) -> {

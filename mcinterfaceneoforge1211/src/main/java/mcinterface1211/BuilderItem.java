@@ -6,7 +6,7 @@ import net.minecraft.core.component.DataComponents;
 import net.minecraft.resources.ResourceLocation;
 
 import java.util.ArrayList;
-import java.util.HashMap;
+// HashMap import removed - no longer needed
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -68,7 +68,7 @@ public class BuilderItem extends Item implements IBuilderItemInterface {
     /**
      * Map of pack namespace registers for content pack items.
      **/
-    protected static final Map<String, DeferredRegister<Item>> packRegisters = new HashMap<>();
+    // Pack registers removed - all items now register in MTS namespace
 
     /**
      * Map of created items linked to their builder instances.  Used for interface operations.
@@ -273,19 +273,5 @@ public class BuilderItem extends Item implements IBuilderItemInterface {
         return item.canBreakBlocks();
     }
 
-    /**
-     * Gets or creates a DeferredRegister for the specified pack namespace.
-     */
-    public static DeferredRegister<Item> getOrCreatePackRegister(String packNamespace) {
-        return packRegisters.computeIfAbsent(packNamespace, namespace ->
-            DeferredRegister.create(Registries.ITEM, namespace)
-        );
-    }
-
-    /**
-     * Registers all pack registers with the mod event bus.
-     */
-    public static void registerPackRegisters(net.neoforged.bus.api.IEventBus modEventBus) {
-        packRegisters.values().forEach(register -> register.register(modEventBus));
-    }
+    // Removed unused pack register methods - all items now register in MTS namespace
 }
