@@ -3,6 +3,7 @@ import net.minecraft.core.registries.Registries;
 
 import java.io.ByteArrayInputStream;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
@@ -142,6 +143,37 @@ class InterfaceCore implements IInterfaceCore {
      */
     private InputStream loadResourceFromContentPacks(String resource, String modID) {
         try {
+            // For development environment, check the MTSOfficialPack directory directly
+            // This is needed because during early mod loading, the pack isn't available as a JAR yet
+            if ("mtsofficialpack".equals(modID)) {
+                File packDir = new File("../MTSOfficialPack-1.21.1/src/main/resources");
+                if (!packDir.exists()) {
+                    // Try alternative path
+                    packDir = new File("C:/Users/alexispace/Desktop/webdev/minecraft/MTSOfficialPack-1.21.1/src/main/resources");
+                }
+
+                if (packDir.exists()) {
+                    // Remove leading slash if present
+                    String resourcePath = resource.startsWith("/") ? resource.substring(1) : resource;
+                    // If resource starts with "assets/", remove it since it's already in the resources folder
+                    if (resourcePath.startsWith("assets/")) {
+                        resourcePath = resourcePath.substring("assets/".length());
+                        // Now add "assets/" back as part of the directory structure
+                        resourcePath = "assets/" + resourcePath;
+                    }
+
+                    File resourceFile = new File(packDir, resourcePath);
+                    if (resourceFile.exists()) {
+                        try {
+                            InterfaceLoader.LOGGER.info("MTS: Loading resource from development pack directory: {}", resource);
+                            return new FileInputStream(resourceFile);
+                        } catch (IOException e) {
+                            InterfaceLoader.LOGGER.warn("MTS: Failed to read from development pack: {}", e.getMessage());
+                        }
+                    }
+                }
+            }
+
             // Get the mods directory - this works for both dev and production environments
             File modsDir = new File("run/mods");
             if (!modsDir.exists()) {
