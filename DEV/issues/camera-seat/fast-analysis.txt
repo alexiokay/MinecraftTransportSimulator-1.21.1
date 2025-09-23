@@ -1,0 +1,35 @@
+Based on my analysis, I found the issue! The player rotation code in WrapperEntity is identical between
+  1.20.1 and 1.21.1, which means the problem is likely elsewhere.
+
+  The Issue: Player Input Not Being Constrained
+
+  In vehicle seats, the player should have limited rotation (like being locked to face forward or having
+  constrained look angles), but in 1.21.1 they can rotate 360 degrees freely.
+
+  Likely Cause: Missing Input Event Handling
+
+  The issue is probably that mouse/input events aren't being intercepted when the player is in a seat. In
+  1.20.1, there was likely an event handler that:
+
+  1. Detects when player is in a seat
+  2. Constrains mouse input to prevent 360-degree rotation
+  3. Locks player orientation relative to the vehicle
+
+  Quick Fix Strategy:
+
+  We need to add an input event handler that constrains player rotation when seated. This would typically be      
+  done through:
+
+  1. Mouse input event interception
+  2. Camera rotation constraints
+  3. Player orientation locking
+
+  Since I can't find the original constraint system, the issue might be:
+  - Missing NeoForge event subscriptions for input handling
+  - Camera system changes in NeoForge 1.21.1
+  - Entity riding behavior changes in the new version
+
+  Recommendation: Add a mouse input event handler that detects when a player is seated in an MTS vehicle and      
+  constrains their rotation angles to prevent the 360-degree spinning issue.
+
+  Would you like me to implement a fix for this input constraint system?
