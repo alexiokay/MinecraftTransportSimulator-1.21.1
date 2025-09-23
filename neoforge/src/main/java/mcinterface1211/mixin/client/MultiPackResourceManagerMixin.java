@@ -38,14 +38,18 @@ public abstract class MultiPackResourceManagerMixin {
      */
     @Inject(method = "<init>(Lnet/minecraft/server/packs/PackType;Ljava/util/List;)V", at = @At(value = "TAIL"))
     public void inject_init(PackType pType, List<PackResources> pPackResources, CallbackInfo ci) {
-        InterfaceManager.coreInterface.logError("RESOURCE MANAGER MIXIN: Injecting pack resources for type: " + pType);
+        if (InterfaceManager.coreInterface != null) {
+            InterfaceManager.coreInterface.logError("RESOURCE MANAGER MIXIN: Injecting pack resources for type: " + pType);
+        }
         List<PackResources> packs2 = new ArrayList<>();
         packs2.addAll(packs);
         packs2.add(InterfaceEventsModelLoader.packPack);
         packs = packs2;
         namespacedManagers.computeIfAbsent(InterfaceLoader.MODID, k -> new FallbackResourceManager(pType, InterfaceLoader.MODID)).push(InterfaceEventsModelLoader.packPack);
         PackParser.getAllPackIDs().forEach(packID -> namespacedManagers.computeIfAbsent(packID, k -> new FallbackResourceManager(pType, packID)).push(InterfaceEventsModelLoader.packPack));
-        InterfaceManager.coreInterface.logError("RESOURCE MANAGER MIXIN: Added pack to " + PackParser.getAllPackIDs().size() + " pack domains");
+        if (InterfaceManager.coreInterface != null) {
+            InterfaceManager.coreInterface.logError("RESOURCE MANAGER MIXIN: Added pack to " + PackParser.getAllPackIDs().size() + " pack domains");
+        }
 
         //Need to do this here since languages happen on pack loading vs on boot.
         //Keep checking until we get more than one: MC starts with only en_us on boot.

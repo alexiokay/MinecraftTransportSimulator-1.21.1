@@ -27,3 +27,6 @@ type="required"
 versionRange="[21.1.0,)"
 ordering="NONE"
 side="BOTH"
+
+[[mixins]]
+config="mts.mixins.json"

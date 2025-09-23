@@ -70,24 +70,8 @@ class InterfaceCore implements IInterfaceCore {
         int modIDEnd = resource.indexOf("/", assetsIndexEnd + 1);
         String modID = resource.substring(assetsIndexEnd, modIDEnd);
 
-        // First try using NeoForge 1.21.1 ResourceManager for proper resource loading
-        try {
-            if (FMLEnvironment.dist == Dist.CLIENT) {
-                // On client side, use Minecraft's resource manager for proper asset loading
-                String resourcePath = resource.substring(resource.indexOf("assets/") + "assets/".length());
-                String namespace = resourcePath.substring(0, resourcePath.indexOf("/"));
-                String path = resourcePath.substring(resourcePath.indexOf("/") + 1);
-
-                ResourceLocation location = ResourceLocation.fromNamespaceAndPath(namespace, path);
-                var resourceManager = Minecraft.getInstance().getResourceManager();
-                var resourceOptional = resourceManager.getResource(location);
-                if (resourceOptional.isPresent()) {
-                    return resourceOptional.get().open();
-                }
-            }
-        } catch (Exception e) {
-            // Fall through to legacy loading methods
-        }
+        // Skip resource manager to avoid circular dependency in PackResourcePack
+        // Fall through directly to ModContainer loading
 
         Optional<? extends ModContainer> optional = ModList.get().getModContainerById(modID);
         if (optional.isPresent()) {
@@ -106,6 +90,14 @@ class InterfaceCore implements IInterfaceCore {
                     }
                 } catch (Exception e) {
                     InterfaceManager.coreInterface.logError("RESOURCE DEBUG: Failed to load from mod container: " + modID + " - " + e.getMessage());
+                }
+
+                // If ModContainer classloader failed, try JAR loading for content packs
+                if (!modID.equals(InterfaceLoader.MODID)) {
+                    InputStream packStream = loadResourceFromContentPacks(resource, modID);
+                    if (packStream != null) {
+                        return packStream;
+                    }
                 }
             }
 

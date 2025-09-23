@@ -1049,7 +1049,7 @@ public class WrapperWorld extends AWrapperWorld {
                 return true;
             }
         } else if (block instanceof ConcretePowderBlock) {
-            world.setBlockAndUpdate(pos, ((ConcretePowderBlockMixin) block).getConcrete());
+            world.setBlockAndUpdate(pos, ((ConcretePowderBlockMixin) block).getConcrete().defaultBlockState());
             return true;
         } else if (block == Blocks.FARMLAND) {
             int moisture = state.getValue(FarmBlock.MOISTURE);

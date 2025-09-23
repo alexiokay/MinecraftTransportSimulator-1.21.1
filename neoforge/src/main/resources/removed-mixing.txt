@@ -1,0 +1,9 @@
+
+"client.GuiGraphicsMixin"
+"client.LevelRendererMixin",
+"client.ListenerMixin",
+"client.MinecraftMixin",
+"client.ModelBakeryMixin",
+"client.MultiPackResourceManagerMixin",
+"client.OptionInstanceMixin",
+"client.VillagerModelMixin"

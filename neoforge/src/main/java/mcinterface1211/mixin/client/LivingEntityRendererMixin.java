@@ -22,12 +22,9 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.phys.Vec3;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 @Mixin(LivingEntityRenderer.class)
 public abstract class LivingEntityRendererMixin<T extends LivingEntity> {
-    private static final Logger LOGGER = LoggerFactory.getLogger(LivingEntityRendererMixin.class);
     private static boolean needToRestoreState = false;
     private static ItemStack heldStackHolder = null;
     private static final Point3D entityScale = new Point3D();
@@ -43,24 +40,10 @@ public abstract class LivingEntityRendererMixin<T extends LivingEntity> {
      */
     @Inject(method = "render", at = @At(value = "INVOKE", target = "Lcom/mojang/blaze3d/vertex/PoseStack;pushPose()V"))
     public void inject_renderPre(T pEntity, float pEntityYaw, float pPartialTicks, PoseStack pMatrixStack, MultiBufferSource pBuffer, int pPackedLight, CallbackInfo ci) {
-        if (pEntity instanceof Player) {
-            LOGGER.error("DEBUG: LivingEntityRendererMixin called for player: {}", ((Player) pEntity).getName().getString());
-        }
 
         WrapperEntity entityWrapper = WrapperEntity.getWrapperFor(pEntity);
         AEntityB_Existing ridingEntity = entityWrapper.getEntityRiding();
 
-        if (pEntity instanceof Player) {
-            Player player = (Player) pEntity;
-            if (player == Minecraft.getInstance().player) {
-                LOGGER.error("DEBUG: Rendering client player - riding entity: {}", ridingEntity != null ? ridingEntity.getClass().getSimpleName() : "null");
-                if (ridingEntity instanceof PartSeat) {
-                    PartSeat seat = (PartSeat) ridingEntity;
-                    LOGGER.error("DEBUG: PartSeat position: {}, {}, {}", seat.position.x, seat.position.y, seat.position.z);
-                    LOGGER.error("DEBUG: Player position: {}, {}, {}", player.getX(), player.getY(), player.getZ());
-                }
-            }
-        }
 
         //This may be null if MC sets this player as riding before the actual entity has time to load NBT.
         if (ridingEntity != null) {
@@ -113,10 +96,6 @@ public abstract class LivingEntityRendererMixin<T extends LivingEntity> {
                 riderTotalTransformation.applyScaling(entityScale);
                 riderTotalTransformation.applyTranslation(0, entityWrapper.getSeatOffset(), 0);
 
-                if (pEntity instanceof Player && ((Player) pEntity) == Minecraft.getInstance().player) {
-                    LOGGER.error("DEBUG: Applying transformation - seatOffset: {}, orientation: {}, scale: {}",
-                        entityWrapper.getSeatOffset(), riderBodyOrientation.angles, entityScale);
-                }
 
                 pMatrixStack.last().pose().mul(InterfaceRender.convertMatrix4f(riderTotalTransformation));
             }

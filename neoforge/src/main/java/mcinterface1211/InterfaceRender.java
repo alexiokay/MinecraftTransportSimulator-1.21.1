@@ -204,9 +204,9 @@ public class InterfaceRender implements IInterfaceRender {
                     //Set the stack variables and render.
                     matrixStack = stack;
                     renderBuffer = buffer;
-                    // Render both solid and translucent passes to ensure lights and particles show
-                    doRenderCall(false, partialTicks);
-                    doRenderCall(true, partialTicks);
+                    // CRITICAL FIX: Render both solid and translucent passes for lights and particles
+                    doRenderCall(false, partialTicks);  // Solid pass
+                    doRenderCall(true, partialTicks);   // Translucent pass
                 }
             }
         });
