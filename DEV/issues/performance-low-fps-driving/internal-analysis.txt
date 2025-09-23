@@ -1,0 +1,51 @@
+ Based on my analysis, I've identified several factors causing    
+   the performance issues in driving animations in the 1.21.1      
+  port:
+
+  Key Performance Bottlenecks Found:
+
+  1. Double Rendering Issue (Main Culprit)
+  - 1.20.1: Calls doRenderCall(false, partialTicks) once per       
+  frame
+  - 1.21.1: Calls both doRenderCall(false, partialTicks) AND       
+  doRenderCall(true, partialTicks) per frame
+  - This effectively doubles the render workload every frame       
+
+  2. Added Texture Caching Overhead
+  - 1.21.1 added textureExistenceCache and textureStateCache       
+  systems
+  - While intended for optimization, these create additional       
+  HashMap lookups during rendering
+  - The cache checking adds micro-delays that accumulate during    
+   animation
+
+  3. ByteBufferBuilder Changes
+  - 1.21.1 uses new ByteBufferBuilder API which has different      
+  memory allocation patterns
+  - May cause more frequent garbage collection during intensive    
+   rendering
+
+  4. Matrix Operations
+  - 1.21.1 sets projectionMatrix twice in LevelRendererMixin       
+  (lines 54 & 55)
+  - Extra matrix operations during every render frame
+
+  5. Missing Mixins
+  - Several client mixins were removed in 1.21.1 (visible in       
+  removed-mixing.txt)
+  - These may have provided optimizations that are now missing     
+
+  Recommendations:
+
+  1. Fix Double Rendering: Consider removing the duplicate
+  doRenderCall(true, partialTicks) in entity renderer
+  2. Optimize Caching: Review if texture caches are actually       
+  improving performance or add overhead
+  3. Check Matrix Operations: Remove redundant projection
+  matrix setting
+  4. Profile Memory: The new ByteBufferBuilder may need heap       
+  tuning
+
+  The primary issue appears to be the double rendering calls       
+  which would explain why driving feels like "half the FPS"        
+  compared to 1.20.1.
