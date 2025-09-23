@@ -1,9 +1,11 @@
 package mcinterface1211.mixin.client;
 
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 
@@ -17,6 +19,7 @@ import minecrafttransportsimulator.entities.instances.EntityPlayerGun;
 import minecrafttransportsimulator.entities.instances.PartSeat;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.MultiBufferSource;
+import net.minecraft.client.renderer.entity.EntityRenderer;
 import net.minecraft.client.renderer.entity.LivingEntityRenderer;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
@@ -24,7 +27,11 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.phys.Vec3;
 
 @Mixin(LivingEntityRenderer.class)
-public abstract class LivingEntityRendererMixin<T extends LivingEntity> {
+public abstract class LivingEntityRendererMixin<T extends LivingEntity> extends EntityRenderer<T> {
+    protected LivingEntityRendererMixin() {
+        super(null);
+    }
+
     private static boolean needToRestoreState = false;
     private static ItemStack heldStackHolder = null;
     private static final Point3D entityScale = new Point3D();
@@ -43,7 +50,6 @@ public abstract class LivingEntityRendererMixin<T extends LivingEntity> {
 
         WrapperEntity entityWrapper = WrapperEntity.getWrapperFor(pEntity);
         AEntityB_Existing ridingEntity = entityWrapper.getEntityRiding();
-
 
         //This may be null if MC sets this player as riding before the actual entity has time to load NBT.
         if (ridingEntity != null) {
@@ -131,6 +137,20 @@ public abstract class LivingEntityRendererMixin<T extends LivingEntity> {
             Player player = (Player) pEntity;
             player.getInventory().setItem(player.getInventory().selected, heldStackHolder);
             heldStackHolder = null;
+        }
+    }
+
+    /**
+     * Override getShadowRadius to return 0 when player is sitting in a vehicle.
+     * This is the method that actually gets called during shadow rendering.
+     */
+    @Inject(method = "getShadowRadius", at = @At("HEAD"), cancellable = true)
+    public void inject_getShadowRadius(T entity, CallbackInfoReturnable<Float> cir) {
+        if (entity instanceof Player) {
+            WrapperEntity entityWrapper = WrapperEntity.getWrapperFor(entity);
+            if (entityWrapper.getEntityRiding() != null) {
+                cir.setReturnValue(0.0f);
+            }
         }
     }
 }
