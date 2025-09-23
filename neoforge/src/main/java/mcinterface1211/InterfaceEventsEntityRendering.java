@@ -106,16 +106,13 @@ public class InterfaceEventsEntityRendering {
     }
 
     /**
-     * Renders MTS GUI elements using overlay approach.
-     * Modal GUIs use BuilderGUI Screen for proper behavior but rendering is still done here.
-     * HUD elements are rendered when no modal GUI is active.
+     * Renders all overlay things.  This is essentially anything that's a 2D render, such as the main overlay,
+     * vehicle HUds, GUIs, camera overlays, etc.
      */
     @SubscribeEvent
-    public static void onIVRenderGUILayer(RenderGuiLayerEvent.Post event) {
-        // Render MTS GUI elements on the HOTBAR layer (after hotbar is drawn)
-        if (!event.getName().equals(VanillaGuiLayers.HOTBAR)) {
-            return;
-        }
+    public static void onIVRenderOverlayChat(CustomizeGuiOverlayEvent.Chat event) {
+        //Do overlay rendering before the chat window is rendered.
+        //This renders them over the main hotbar, but doesn't block the chat window.
 
         Window window = Minecraft.getInstance().getWindow();
         long displaySize = InterfaceManager.clientInterface.getPackedDisplaySize();
@@ -127,10 +124,9 @@ public class InterfaceEventsEntityRendering {
         double[] yPos = new double[1];
         GLFW.glfwGetCursorPos(window.getWindow(), xPos, yPos);
 
-        // Use GUI scale to convert physical mouse coordinates to GUI coordinates
-        double guiScale = window.getGuiScale();
-        int mouseX = (int) (xPos[0] / guiScale);
-        int mouseY = (int) (yPos[0] / guiScale);
+        // Convert physical mouse coordinates to GUI coordinates using screen dimensions (1.20.1 approach)
+        int mouseX = (int) (xPos[0] * screenWidth / window.getScreenWidth());
+        int mouseY = (int) (yPos[0] * screenHeight / window.getScreenHeight());
 
         float partialTicks = event.getPartialTick().getGameTimeDeltaPartialTick(false);
         boolean updateGUIs = screenWidth != lastScreenWidth || screenHeight != lastScreenHeight;
@@ -139,16 +135,7 @@ public class InterfaceEventsEntityRendering {
             lastScreenHeight = screenHeight;
         }
 
-        // Mouse input handling is now done through BuilderGUI Screen approach for proper modal behavior
-
-        // Render MTS GUI system using the original MTS rendering pipeline
-        event.getGuiGraphics().pose().pushPose();
-        event.getGuiGraphics().pose().translate(0.0, 0.0, 200.0);
-
-        // Use the MTS rendering system which handles both HUD and modal GUIs correctly
         InterfaceRender.renderGUI(event.getGuiGraphics(), mouseX, mouseY, screenWidth, screenHeight, partialTicks, updateGUIs);
-
-        event.getGuiGraphics().pose().popPose();
     }
 
 
