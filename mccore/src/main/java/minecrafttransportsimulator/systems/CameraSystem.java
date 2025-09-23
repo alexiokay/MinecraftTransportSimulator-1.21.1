@@ -133,6 +133,18 @@ public class CameraSystem {
             sittingSeat.getInterpolatedOrientation(cameraRotation, partialTicks);
             sittingSeat.getRiderInterpolatedOrientation(riderOrientation, partialTicks);
             cameraRotation.multiply(riderOrientation);
+
+            // IMPORTANT: Apply camera mode-specific orientation changes
+            // This is what makes front/back third-person modes behave differently
+            CameraMode cameraMode = InterfaceManager.clientInterface.getCameraMode();
+            if (cameraMode == CameraMode.THIRD_PERSON_INVERTED) {
+                // For front-facing camera, rotate 180 degrees in Y
+                RotationMatrix flipMatrix = new RotationMatrix();
+                Point3D flipAngles = new Point3D(0, 180, 0);
+                flipMatrix.setToAngles(flipAngles);
+                cameraRotation.multiply(flipMatrix);
+            }
+
             return true;
         } else {
             //Not doing any camera changes.

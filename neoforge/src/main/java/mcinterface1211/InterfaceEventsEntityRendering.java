@@ -62,6 +62,7 @@ public class InterfaceEventsEntityRendering {
                 //Camera adjustments occur backwards here.  Reverse order in the matrix.
                 //Also need to reverse sign of Y, since that's backwards in MC.
                 cameraAdjustedOrientation.convertToAngles();
+
                 if (InterfaceManager.clientInterface.getCameraMode() == CameraMode.THIRD_PERSON_INVERTED) {
                     //Inverted third-person needs roll and pitch flipped due to the opposite perspective.
                     //It also needs the camera rotated 180 in the Y to face the other direction.
@@ -76,16 +77,7 @@ public class InterfaceEventsEntityRendering {
                 //Move the info's setup to the set position of the camera.
                 //This will offset the player's eye position to match the camera.
                 //We do this in first-person mode since third-person adds zoom stuff.
-                // Use reflection to call setPosition for proper camera behavior
-                // This works around NeoForge's module system restrictions on Mixins
-                try {
-                    java.lang.reflect.Method setPositionMethod = camera.getClass().getDeclaredMethod("setPosition", double.class, double.class, double.class);
-                    setPositionMethod.setAccessible(true);
-                    setPositionMethod.invoke(camera, cameraAdjustedPosition.x, cameraAdjustedPosition.y, cameraAdjustedPosition.z);
-                } catch (Exception e) {
-                    // Fallback to Access Transformer method if reflection fails
-                    camera.setPosition(cameraAdjustedPosition.x, cameraAdjustedPosition.y, cameraAdjustedPosition.z);
-                }
+                ((mcinterface1211.mixin.client.CameraMixin) camera).invoke_setPosition(cameraAdjustedPosition.x, cameraAdjustedPosition.y, cameraAdjustedPosition.z);
                 adjustedCamera = true;
             }
         }
