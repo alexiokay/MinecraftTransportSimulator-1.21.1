@@ -77,19 +77,27 @@ Our explicit `PacketEntityRemove` system bypasses all this dead infrastructure a
 
 ## Recommendation: Cleanup
 
-Since our explicit packet system works perfectly and the old tracking system is unused dead code, we should:
+Since our explicit packet system works perfectly, we can clean up dead code while keeping working infrastructure:
 
-### Keep (Still Useful)
+### Keep (Working Infrastructure)
 - ✅ `getEntity(UUID)` - Used by packets to find target entities
 - ✅ `trackedEntityMap` - Still needed for packet targeting
+- ✅ **Auto-rebroadcast system** - **WORKS PERFECTLY for entity UPDATES**
+- ✅ `shouldSync()` method - Used to determine tracking eligibility
 
-### Remove (Dead Code)
-- ❌ `shouldSync()` logic in removal - Not doing anything
-- ❌ Auto-rebroadcast hopes - Never worked for removal
+### Remove (Dead Code) - EXACT LOCATIONS
+**File**: `EntityManager.java` **Lines 403-405**
+```java
+// REMOVE THESE LINES:
+if (entity.shouldSync()) {
+    trackedEntityMap.remove(entity.uniqueUUID);
+}
+```
+**Why**: This removal tracking does nothing - no auto-sync uses it for removal
 
 ### Update Documentation
-- Document that entity sync is now explicit via `PacketEntityRemove`
-- Note that auto-sync was never fully implemented
+- ✅ Entity sync status: Creation (explicit), **Updates (auto-rebroadcast)**, Removal (explicit)
+- ✅ Auto-sync works perfectly for updates, only removal needed manual packets
 
 ## Evidence This Was Broken
 
@@ -105,6 +113,14 @@ Multiple commits about entity sync issues suggest this has been an ongoing probl
 
 ## Conclusion
 
-The "1.20.1 system" was likely never fully working. Our explicit `PacketEntityRemove` approach is the first time entity removal synchronization has worked correctly in MTS.
+**CORRECTION**: The 1.20.1 system was partially working!
 
-The tracking infrastructure should stay (used by packets) but we shouldn't expect it to do automatic sync that it was never designed to do.
+- ✅ **Entity UPDATES**: Auto-rebroadcast system works perfectly via `APacketEntity.handle()`
+- ❌ **Entity REMOVAL**: Never had automatic sync - this was the missing piece
+
+Our explicit `PacketEntityRemove` completed the sync system. Now we have:
+- ✅ **Entity Creation**: Explicit packets
+- ✅ **Entity Updates**: Auto-rebroadcast system (working since 1.20.1)
+- ✅ **Entity Removal**: Explicit `PacketEntityRemove` (new fix)
+
+The tracking infrastructure should stay - it's actively used by the working auto-rebroadcast system.
