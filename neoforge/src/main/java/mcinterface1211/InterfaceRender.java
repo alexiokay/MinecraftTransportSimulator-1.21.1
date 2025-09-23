@@ -197,7 +197,7 @@ public class InterfaceRender implements IInterfaceRender {
 
             @Override
             public void render(BuilderEntityRenderForwarder builder, float entityYaw, float partialTicks, PoseStack stack, MultiBufferSource buffer, int packedLight) {
-                if (builder.playerFollowing == Minecraft.getInstance().player && !ConfigSystem.settings.general.forceRenderLastSolid.value) {
+                if (builder.playerFollowing == Minecraft.getInstance().player) {
                     //Set camera offset point for later.
                     renderCameraOffset.set(Mth.lerp(partialTicks, builder.xOld, builder.getX()), Mth.lerp(partialTicks, builder.yOld, builder.getY()), Mth.lerp(partialTicks, builder.zOld, builder.getZ()));
 

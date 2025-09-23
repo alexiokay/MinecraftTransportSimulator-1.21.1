@@ -6,7 +6,10 @@
 		"client": [
 				"client.CameraMixin",
 				"client.HumanoidModelMixin",
-				"client.LivingEntityRendererMixin"
+				"client.LivingEntityRendererMixin",
+				
+				"client.MinecraftMixin",
+				"client.ModelBakeryMixin"
 				
     ],
 	"client_disabled": [

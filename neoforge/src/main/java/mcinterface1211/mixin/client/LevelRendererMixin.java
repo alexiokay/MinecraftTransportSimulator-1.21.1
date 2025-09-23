@@ -52,9 +52,6 @@ public abstract class LevelRendererMixin {
         InterfaceRender.renderBuffer = irendertypebuffer$impl;
         // Ensure projection matrix is set right before rendering
         InterfaceRender.projectionMatrix = pProjection;
-        if (ConfigSystem.settings.general.forceRenderLastSolid.value) {
-            InterfaceRender.doRenderCall(false, pPartialTicks);
-        }
         InterfaceRender.doRenderCall(true, pPartialTicks);
         //Need to end batch after drawing translucents, otherwise they'll get other matrices applied.
         irendertypebuffer$impl.endBatch();
