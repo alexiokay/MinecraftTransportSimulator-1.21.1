@@ -27,6 +27,7 @@ import minecrafttransportsimulator.mcinterface.AWrapperWorld;
 import minecrafttransportsimulator.mcinterface.IWrapperEntity;
 import minecrafttransportsimulator.mcinterface.IWrapperNBT;
 import minecrafttransportsimulator.mcinterface.InterfaceManager;
+import minecrafttransportsimulator.packets.instances.PacketEntityRemove;
 import minecrafttransportsimulator.systems.CameraSystem;
 
 /**
@@ -391,6 +392,12 @@ public abstract class EntityManager {
      * Removes this entity from the world.  Taking it off the update/functional lists.
      */
     public void removeEntity(AEntityA_Base entity) {
+        // Send removal packet to all clients if we're on the server
+        if (!getWorld().isClient() && entity.shouldSync()) {
+            InterfaceManager.coreInterface.logError("ENTITY SYNC DEBUG: Sending removal packet to clients for " + entity.getClass().getSimpleName() + " UUID " + entity.uniqueUUID);
+            InterfaceManager.packetInterface.sendToAllClients(new PacketEntityRemove(entity));
+        }
+
         allEntities.remove(entity);
         allNormalTickableEntities.remove(entity);
         allPlayerTickableEntities.remove(entity);
@@ -398,9 +405,7 @@ public abstract class EntityManager {
             renderableEntities.remove(entity);
         }
         entitiesByClass.get(entity.getClass()).remove(entity);
-        if (entity.shouldSync()) {
-            trackedEntityMap.remove(entity.uniqueUUID);
-        }
+        // Note: trackedEntityMap removal not needed - only used for auto-rebroadcast system for updates
         if (entity instanceof EntityBullet) {
             EntityBullet bullet = (EntityBullet) entity;
             bulletMap.get(bullet.gun.uniqueUUID).remove(bullet.bulletNumber);
