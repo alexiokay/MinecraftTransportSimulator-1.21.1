@@ -381,6 +381,7 @@ public class InterfaceRender implements IInterfaceRender {
         } else {
             String typeID = data.texture + data.isTranslucent + data.lightingMode + data.enableBrightBlending;
             final RenderType renderType;
+            // Mode 0 and Mode 1 both use cached vertex buffers
             if (data.vertexObject.cacheVertices && !renderingGUI && ConfigSystem.client.renderingSettings.renderingMode.value != 2) {
             	//Get the render type and data buffer for this entity.
                 renderType = renderTypes.computeIfAbsent(typeID, k -> CustomRenderType.create("mts_entity", DefaultVertexFormat.NEW_ENTITY, VertexFormat.Mode.TRIANGLES, 2097152, true, data.isTranslucent, CustomRenderType.createForObject(data).createCompositeState(false)));
@@ -413,6 +414,7 @@ public class InterfaceRender implements IInterfaceRender {
                     }
                     bufferData.isReady = true;
                     bufferData.buffer.bind();
+                    // MC 1.21.1: BufferBuilder.buildOrThrow() returns RenderedBuffer which can be uploaded directly
                     bufferData.buffer.upload(builder.buildOrThrow());
                     data.vertexObject.vertices.rewind();
                     VertexBuffer.unbind();
@@ -614,9 +616,16 @@ public class InterfaceRender implements IInterfaceRender {
                     renderType.clearRenderState();
                     continue;
                 }
+                // Initialize projection matrix if not already set (Mode 1 fix)
+                if (projectionMatrix == null) {
+                    projectionMatrix = RenderSystem.getProjectionMatrix();
+                }
                 for (RenderData data : datas) {
                     data.bufferData.buffer.bind();
-                    data.bufferData.buffer.drawWithShader(data.matrix, projectionMatrix, shader);
+                    // Mode 1: Combine entity matrix with current view matrix like Mode 0
+                    Matrix4f modelViewMatrix = new Matrix4f(RenderSystem.getModelViewMatrix());
+                    modelViewMatrix.mul(data.matrix);
+                    data.bufferData.buffer.drawWithShader(modelViewMatrix, projectionMatrix, shader);
                 }
                 VertexBuffer.unbind();
                 renderType.clearRenderState();
