@@ -82,6 +82,7 @@ public final class ConfigSystem {
                 client.controls = new JSONConfigClient.JSONControls();
                 client.controls.keysetID = InterfaceManager.inputInterface.getKeysetID();
             }
+
         }
 
         //Get overrides file location.  This is used later when packs are parsed.

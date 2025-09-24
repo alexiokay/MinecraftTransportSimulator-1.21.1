@@ -315,7 +315,8 @@ public class RenderableModelObject {
                             flareRenderable.transform.set(renderable.transform);
                             flareRenderable.render();
                         }
-                        if (beamRenderable != null && ConfigSystem.client.renderingSettings.renderBeams.value) {
+                        if (beamRenderable != null && ConfigSystem.client.renderingSettings.renderBeams.value &&
+                            !InterfaceManager.renderingInterface.shouldDisableBeamsForShaderCompatibility()) {
                             beamRenderable.setLightValue(renderable.worldLightValue);
                             beamRenderable.setLightMode(ConfigSystem.client.renderingSettings.brightLights.value ? LightingMode.IGNORE_ALL_LIGHTING : LightingMode.NORMAL);
                             beamRenderable.setBlending(ConfigSystem.client.renderingSettings.blendedLights.value);

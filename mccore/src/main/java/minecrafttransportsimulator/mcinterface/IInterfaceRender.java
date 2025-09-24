@@ -80,4 +80,10 @@ public interface IInterfaceRender {
      * Returns true if bounding boxes should be rendered.
      */
     boolean shouldRenderBoundingBoxes();
+
+    /**
+     * Returns true if beam rendering should be disabled for shader compatibility.
+     * This is used when Iris/Oculus shader mods are detected.
+     */
+    boolean shouldDisableBeamsForShaderCompatibility();
 }

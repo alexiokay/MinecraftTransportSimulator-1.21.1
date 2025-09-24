@@ -100,7 +100,6 @@ public class InterfaceRender implements IInterfaceRender {
     public static MultiBufferSource renderBuffer;
     public static Point3D renderCameraOffset = new Point3D();
     private static boolean renderingGUI;
-    private static boolean projectionMatrixWarningLogged = false;
 
     private static ShaderInstance entityLightsShader;
     private static ShaderInstance entityCutoutNoshadowsShader;
@@ -117,14 +116,10 @@ public class InterfaceRender implements IInterfaceRender {
             MISSING_STATE = new RenderStateShard.TextureStateShard(ResourceLocation.fromNamespaceAndPath("mts", "textures/rendering/missing.png"), false, false);
             BLOCK_STATE = new RenderStateShard.TextureStateShard(BLOCK_TEXTURE_LOCATION, false, false);
 
-            //Also set the debug flag to prevent first-render debug delays
-            projectionMatrixWarningLogged = true;
-
-            InterfaceManager.coreInterface.logError("TEXTURE INIT: Texture states initialized during mod setup");
-            InterfaceManager.coreInterface.logError("TEXTURE INIT: Skipped first-render matrix debug to prevent delays");
 
             // Preload common texture paths to prevent render delays
             preloadCommonTextures();
+
         }
     }
 
@@ -380,7 +375,8 @@ public class InterfaceRender implements IInterfaceRender {
             //Rewind buffer for next read.
             data.vertexObject.vertices.rewind();
         } else {
-            String typeID = data.texture + data.isTranslucent + data.lightingMode + data.enableBrightBlending;
+            // CRITICAL FIX: Include shader state in cache key so render types update when shaders toggle
+            String typeID = data.texture + data.isTranslucent + data.lightingMode + data.enableBrightBlending + ModCompatibility.areShadersEnabled();
             final RenderType renderType;
             // Mode 0 and Mode 1 both use cached vertex buffers
             if (data.vertexObject.cacheVertices && !renderingGUI && ConfigSystem.client.renderingSettings.renderingMode.value != 2) {
@@ -430,9 +426,9 @@ public class InterfaceRender implements IInterfaceRender {
                 renders.add(new RenderData(stackEntry.pose(), bufferData));
             } else {
                 stackEntry.normal().mul(matrix3f);
+                // Use the same typeID that includes shader state for consistency
                 renderType = renderTypes.computeIfAbsent(typeID, k -> CustomRenderType.create("mts_entity_" + typeID, DefaultVertexFormat.NEW_ENTITY, VertexFormat.Mode.TRIANGLES, 256, true, data.isTranslucent, CustomRenderType.createForObject(data).createCompositeState(false)));
                 VertexConsumer buffer = renderBuffer.getBuffer(renderType);
-                //System.out.println(renderType);
                 while (data.vertexObject.vertices.hasRemaining()) {
                     //Need to parse these out first since our order differs.
                     float normalX = data.vertexObject.vertices.get();
@@ -546,15 +542,10 @@ public class InterfaceRender implements IInterfaceRender {
                         hasNamedUniforms = true;
                     }
                 } catch (Exception e) {
-                    InterfaceManager.coreInterface.logError("MATRIX DEBUG: Exception getting uniforms by name: " + e.getMessage());
+                    // Uniforms not accessible via reflection
                 }
 
                 // Debug logging - only log once per approach
-                if (!projectionMatrixWarningLogged) {
-                    InterfaceManager.coreInterface.logError("MATRIX DEBUG: Direct fields available: " + hasDirectFields + ", Named uniforms available: " + hasNamedUniforms);
-                    InterfaceManager.coreInterface.logError("MATRIX DEBUG: Shader name: " + (shaderInstance != null ? shaderInstance.getName() : "null"));
-                    projectionMatrixWarningLogged = true;
-                }
                 // INVERSE_VIEW_ROTATION_MATRIX removed in MC 1.21.1 - replaced with uniform blocks
                 // TODO: Implement proper uniform block handling for view rotation matrix
                 // if (shaderInstance.INVERSE_VIEW_ROTATION_MATRIX != null) {
@@ -651,8 +642,8 @@ public class InterfaceRender implements IInterfaceRender {
             RenderType.CompositeState.CompositeStateBuilder stateBuilder = RenderType.CompositeState.builder();
 
             //Set shader to use.
-            // When Iris is active, use standard Minecraft shaders for compatibility
-            if (ModCompatibility.hasShaderMod()) {
+            // When Iris shader pack is ACTIVELY RUNNING, use standard Minecraft shaders for compatibility
+            if (ModCompatibility.areShadersEnabled()) {
                 // Iris shader pack is active - use standard Minecraft shaders only
                 // Per Iris documentation: custom shaders are ignored when shader packs are loaded
                 if (data.isTranslucent) {
@@ -732,6 +723,11 @@ public class InterfaceRender implements IInterfaceRender {
     @Override
     public boolean shouldRenderBoundingBoxes() {
         return Minecraft.getInstance().getEntityRenderDispatcher().shouldRenderHitBoxes();
+    }
+
+    @Override
+    public boolean shouldDisableBeamsForShaderCompatibility() {
+        return ModCompatibility.areShadersEnabled();
     }
 
     @Override

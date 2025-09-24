@@ -6,7 +6,8 @@
       "Read(//c/Users/alexispace/Desktop/webdev/minecraft/old/MinecraftTransportSimulator/mcinterfaceforge1201/src/main/java/mcinterface1201/**)",
       "Read(//c/Users/alexispace/Desktop/webdev/minecraft/old/MinecraftTransportSimulator/mcinterfaceforge1201/**)",
       "WebSearch",
-      "WebFetch(domain:github.com)"
+      "WebFetch(domain:github.com)",
+      "Read(//c/Users/alexispace/Desktop/webdev/minecraft/old/MinecraftTransportSimulator/mccore/src/main/java/minecrafttransportsimulator/rendering/**)"
     ],
     "deny": [],
     "ask": []
