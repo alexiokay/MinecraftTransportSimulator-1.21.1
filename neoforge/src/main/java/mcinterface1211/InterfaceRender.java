@@ -128,6 +128,7 @@ public class InterfaceRender implements IInterfaceRender {
         }
     }
 
+
     /**
      * Preloads common MTS textures to prevent I/O delays during first render.
      */
@@ -650,7 +651,16 @@ public class InterfaceRender implements IInterfaceRender {
             RenderType.CompositeState.CompositeStateBuilder stateBuilder = RenderType.CompositeState.builder();
 
             //Set shader to use.
-            if (data.lightingMode.disableTextureShadows) {
+            // When Iris is active, use standard Minecraft shaders for compatibility
+            if (ModCompatibility.hasShaderMod()) {
+                // Iris shader pack is active - use standard Minecraft shaders only
+                // Per Iris documentation: custom shaders are ignored when shader packs are loaded
+                if (data.isTranslucent) {
+                    stateBuilder.setShaderState(new RenderStateShard.ShaderStateShard(() -> GameRenderer.getRendertypeEntityTranslucentShader()));
+                } else {
+                    stateBuilder.setShaderState(new RenderStateShard.ShaderStateShard(() -> GameRenderer.getRendertypeEntityCutoutShader()));
+                }
+            } else if (data.lightingMode.disableTextureShadows) {
                 //This shouldn't use OpenGL lighting, use shader that ignores this.
                 if (data.lightingMode.disableWorldLighting) {
                     stateBuilder.setShaderState(MTS_ENTITY_LIGHTS_SHADER);
@@ -658,9 +668,9 @@ public class InterfaceRender implements IInterfaceRender {
                     stateBuilder.setShaderState(MTS_ENTITY_CUTOUT_NOSHADOWS_SHADER);
                 }
             } else if (data.isTranslucent) {
-                stateBuilder.setShaderState(RENDERTYPE_ENTITY_SOLID_SHADER);
+                stateBuilder.setShaderState(new RenderStateShard.ShaderStateShard(() -> GameRenderer.getRendertypeEntityTranslucentShader()));
             } else {
-                stateBuilder.setShaderState(RENDERTYPE_ENTITY_CUTOUT_SHADER);
+                stateBuilder.setShaderState(new RenderStateShard.ShaderStateShard(() -> GameRenderer.getRendertypeEntityCutoutShader()));
             }
 
             //Set transparency.
