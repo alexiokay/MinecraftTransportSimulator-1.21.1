@@ -59,48 +59,32 @@ class InterfaceCore implements IInterfaceCore {
     
     @Override
     public InputStream getPackResource(String resource) {
-        // Extract mod ID from resource path like "/assets/mtsofficialpack/objmodels/..."
         int assetsIndexEnd = resource.indexOf("assets/") + "assets/".length();
         int modIDEnd = resource.indexOf("/", assetsIndexEnd + 1);
         String modID = resource.substring(assetsIndexEnd, modIDEnd);
-
-        // Convert to ResourceLocation format
-        String resourcePath = resource.substring(modIDEnd + 1); // Remove "/assets/modid/"
-        ResourceLocation resourceLocation = ResourceLocation.fromNamespaceAndPath(modID, resourcePath);
-
-        // Try using Minecraft's client-side resource manager if available
-        if (FMLEnvironment.dist == Dist.CLIENT) {
-            try {
-                var resourceManager = Minecraft.getInstance().getResourceManager();
-                var resourceResource = resourceManager.getResource(resourceLocation);
-                if (resourceResource.isPresent()) {
-                    return resourceResource.get().open();
-                }
-            } catch (Exception e) {
-                // Fall through to ModContainer loading
-            }
-        }
-
-        // Use NeoForge's ModContainer system as fallback
         Optional<? extends ModContainer> optional = ModList.get().getModContainerById(modID);
         if (optional.isPresent()) {
             ModContainer container = optional.get();
 
-            // Try the container's classloader
-            ClassLoader classLoader = container.getClass().getClassLoader();
-            InputStream stream = classLoader.getResourceAsStream(resource);
+            // Strategy 1: Try the container's classloader (original approach)
+            ClassLoader containerClassLoader = container.getClass().getClassLoader();
+            InputStream stream = containerClassLoader.getResourceAsStream(resource);
             if (stream != null) {
                 return stream;
             }
 
-            // For MTS core mod in dev environment
-            if (modID.equals(InterfaceLoader.MODID)) {
-                return InterfaceManager.class.getResourceAsStream(resource);
+            // Strategy 2: Try Thread context classloader
+            try {
+                ClassLoader contextClassLoader = Thread.currentThread().getContextClassLoader();
+                stream = contextClassLoader.getResourceAsStream(resource);
+                if (stream != null) {
+                    return stream;
+                }
+            } catch (Exception e) {
+                // Continue
             }
         }
-
-        // Final fallback
-        return Blocks.AIR.getClass().getResourceAsStream(resource);
+        return null;
     }
 
 

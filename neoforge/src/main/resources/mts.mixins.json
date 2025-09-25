@@ -7,15 +7,16 @@
 				"client.CameraMixin",
 				"client.HumanoidModelMixin",
 				"client.LivingEntityRendererMixin",
-				
 				"client.MinecraftMixin",
-				"client.ModelBakeryMixin"
-				
+				"client.ModelBakeryMixin",
+				"client.MultiPackResourceManagerMixin",
+				"client.OptionInstanceMixin"
     ],
 	"client_disabled": [
 				
 	],
 		"mixins": [
+				"common.BiomeMixin",
 				"common.ConcretePowderBlockMixin",
 				"common.DimensionDataStorageMixin",
 				"common.EntityMixin"
