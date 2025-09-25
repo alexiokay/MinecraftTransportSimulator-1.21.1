@@ -140,8 +140,11 @@ class InterfaceCore implements IInterfaceCore {
             if ("mtsofficialpack".equals(modID)) {
                 File packDir = new File("../MTSOfficialPack-1.21.1/src/main/resources");
                 if (!packDir.exists()) {
-                    // Try alternative path
-                    packDir = new File("C:/Users/alexispace/Desktop/webdev/minecraft/MTSOfficialPack-1.21.1/src/main/resources");
+                    // Try environment variable or system property for pack location
+                    String packPath = System.getProperty("mts.pack.path", System.getenv("MTS_PACK_PATH"));
+                    if (packPath != null) {
+                        packDir = new File(packPath);
+                    }
                 }
 
                 if (packDir.exists()) {
