@@ -1,6 +1,8 @@
 package mcinterface1211;
 
 import java.io.File;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -101,6 +103,10 @@ public class InterfaceLoader {
      * 
      */
     public void init(FMLConstructModEvent event) {
+        String dir = System.getProperty("fmod.nativesDir", "C:/sources/MinecraftTransportSimulator-NeoForge/neoforge/run/natives");
+        Path n = Paths.get(dir);
+        System.load(n.resolve("fmod.dll").toString());
+        System.load(n.resolve("fmodstudio.dll").toString());
         //Add registries.
         BuilderItem.ITEMS.register(modEventBus);
         BuilderBlock.BLOCKS.register(modEventBus);
@@ -305,6 +311,8 @@ public class InterfaceLoader {
             //Save modified config.
             ConfigSystem.saveToDisk();
         }
+
+        InterfaceSound.FMODSystemInit();
     }
 
     public void onPostConstruction(FMLLoadCompleteEvent event) {

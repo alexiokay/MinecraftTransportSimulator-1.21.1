@@ -95,6 +95,9 @@ dependencies {
     //PlayerAnimator API for player model animations - DISABLED due to conflicts
     //implementation "dev.kosmx.player-anim:player-animation-lib-forge:2.0.1+1.21.1"
     runtimeOnly "mezz.jei:jei-1.21.1-neoforge:19.22.1.316"
+
+    implementation "org.lwjgl:lwjgl-fmod:3.3.3"
+    additionalRuntimeClasspath "org.lwjgl:lwjgl-fmod:3.3.3"
 }
 
 tasks.withType(JavaCompile).configureEach {

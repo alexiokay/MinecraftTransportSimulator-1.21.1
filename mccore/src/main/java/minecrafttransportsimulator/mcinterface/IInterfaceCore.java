@@ -49,6 +49,10 @@ public interface IInterfaceCore {
      */
     void logError(String message);
 
+    void logErrorMain(String message);
+
+    void logInfo(String message);
+
     /**
      * Returns a new NBT IWrapper instance with no data.
      */

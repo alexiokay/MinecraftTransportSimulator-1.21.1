@@ -13,6 +13,9 @@ public class JSONSound {
     @JSONDescription("A list of sounds to play instead of the main sound.  If this is present, then one of these at random will be played each time this sound is played rather than the normal sound.  Note that a paramter for name is still required to allow the audio system to track this sound, and should be unique to the entity this is defined on.")
     public List<String> soundVariations;
 
+    @JSONDescription("Name of the FMOD sound event.")
+    public String eventName;
+
     @JSONRequired
     @JSONDescription("A required listing of animation objects for determining if this sound is active.  Visibility transforms will turn the sound on and off.  Inhibitor and activator transforms may be used in conjunction with these for advanced on/off logic.  Note that non-looping sounds are only played when all the animations in this block change the visibility state from 0 to 1.  If you want the sound to play every tick the visibility state is at 1, set repeating to true.")
     public List<JSONAnimationDefinition> activeAnimations;

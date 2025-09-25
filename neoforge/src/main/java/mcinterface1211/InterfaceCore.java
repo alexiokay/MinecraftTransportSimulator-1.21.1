@@ -94,6 +94,16 @@ class InterfaceCore implements IInterfaceCore {
     }
 
     @Override
+    public void logErrorMain(String message) {
+        InterfaceLoader.LOGGER.error("FMOD SYSTEM ERROR: " + message);
+    }
+
+    @Override
+    public void logInfo(String message) {
+        InterfaceLoader.LOGGER.info("FMOD SYSTEM INFO: " + message);
+    }
+
+    @Override
     public IWrapperNBT getNewNBTWrapper() {
         return new WrapperNBT();
     }

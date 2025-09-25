@@ -24,6 +24,8 @@ public interface IInterfaceSound {
      */
     void playQuickSound(SoundInstance sound);
 
+    void FMODPlaySoundEvent(SoundInstance sound);
+
     /**
      * Adds a station to be queued for updates.  This should only be done once upon station construction.
      */
