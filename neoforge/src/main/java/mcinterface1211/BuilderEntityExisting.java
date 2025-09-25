@@ -72,6 +72,13 @@ public class BuilderEntityExisting extends ABuilderEntityBase {
      **/
     private WrapperAABBCollective interactAttackBoxes;
 
+    /**
+     * Entity loading retry mechanism to handle race conditions during world loading.
+     * Prevents entities from being permanently lost when entityMap isn't fully populated yet.
+     **/
+    private int entityLoadRetries = 0;
+    private static final int MAX_ENTITY_LOAD_RETRIES = 60; // 3 seconds at 20 TPS
+
     public BuilderEntityExisting(EntityType<? extends BuilderEntityExisting> eType, Level world) {
         super(eType, world);
     }
@@ -148,11 +155,26 @@ public class BuilderEntityExisting extends ABuilderEntityBase {
                     InterfaceManager.coreInterface.logError("ENTITY DEBUG: EntityMap size: " + entityMap.size());
 
                     if (entityMap.get(entityId) == null) {
-                        InterfaceManager.coreInterface.logError("ENTITY DEBUG: Entity factory not found for ID: '" + entityId + "'");
-                        InterfaceManager.coreInterface.logError("ENTITY DEBUG: This entity will be skipped");
-                        return;
+                        // Entity factory not found - this could be a race condition during startup
+                        if (entityLoadRetries < MAX_ENTITY_LOAD_RETRIES) {
+                            entityLoadRetries++;
+                            if (entityLoadRetries % 20 == 0) { // Log every second
+                                InterfaceManager.coreInterface.logError("ENTITY RECOVERY: Entity factory not found for ID: '" + entityId + "' (attempt " + entityLoadRetries + "/" + MAX_ENTITY_LOAD_RETRIES + ")");
+                                InterfaceManager.coreInterface.logError("ENTITY RECOVERY: Available entity IDs: " + entityMap.keySet());
+                                InterfaceManager.coreInterface.logError("ENTITY RECOVERY: Retrying entity loading...");
+                            }
+                            return; // Retry next tick
+                        } else {
+                            // Max retries exceeded - entity is truly missing
+                            InterfaceManager.coreInterface.logError("ENTITY RECOVERY: FAILED - Entity factory never found for ID: '" + entityId + "' after " + MAX_ENTITY_LOAD_RETRIES + " attempts");
+                            InterfaceManager.coreInterface.logError("ENTITY RECOVERY: Available entity IDs: " + entityMap.keySet());
+                            InterfaceManager.coreInterface.logError("ENTITY RECOVERY: This indicates a missing or changed pack - entity will be permanently removed");
+                            discard(); // Remove the entity cleanly
+                            return;
+                        }
                     }
 
+                    // Entity factory found - proceed with loading
                     entity = entityMap.get(entityId).restoreEntityFromData(worldWrapper, data);
                     entity.world.addEntity(entity);
                     if (entity instanceof AEntityF_Multipart) {
@@ -160,9 +182,16 @@ public class BuilderEntityExisting extends ABuilderEntityBase {
                     }
                     loadedFromSavedNBT = true;
                     lastLoadedNBT = null;
+
+                    // Log successful recovery if we had to retry
+                    if (entityLoadRetries > 0) {
+                        InterfaceManager.coreInterface.logError("ENTITY RECOVERY: SUCCESS - Entity '" + entityId + "' loaded successfully after " + entityLoadRetries + " attempts");
+                    }
                 } catch (Exception e) {
+                    InterfaceManager.coreInterface.logError("ENTITY RECOVERY: Exception during entity loading (attempt " + (entityLoadRetries + 1) + ")");
                     InterfaceManager.coreInterface.logError("Failed to load entity on builder from saved NBT.  Did a pack change?");
                     InterfaceManager.coreInterface.logError(e.getMessage());
+                    e.printStackTrace();
                     discard();
                 }
             }
