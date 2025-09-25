@@ -10,7 +10,10 @@
 				"client.MinecraftMixin",
 				"client.ModelBakeryMixin",
 				"client.MultiPackResourceManagerMixin",
-				"client.OptionInstanceMixin"
+				"client.OptionInstanceMixin",
+				"client.VillagerModelMixin"
+
+		
     ],
 	"client_disabled": [
 				

@@ -29,9 +29,8 @@ repositories {
 
 //Configuration that holds jars to include in the jar
 configurations {
-    embed
-    implementation.extendsFrom(embed)
     jarJar
+    fmodOnly
 }
 
 //NeoForge configuration
@@ -96,10 +95,32 @@ dependencies {
     //implementation "dev.kosmx.player-anim:player-animation-lib-forge:2.0.1+1.21.1"
     runtimeOnly "mezz.jei:jei-1.21.1-neoforge:19.22.1.316"
 
-    implementation "org.lwjgl:lwjgl-fmod:3.3.3"
-    additionalRuntimeClasspath "org.lwjgl:lwjgl-fmod:3.3.3"
+    // FMOD bindings - back to 3.3.3, focus on working in dev mode first
+    compileOnly("org.lwjgl:lwjgl-fmod:3.3.3")
+    // For development environment
+    additionalRuntimeClasspath("org.lwjgl:lwjgl-fmod:3.3.3")
+    // Add to fmodOnly configuration for extraction
+    fmodOnly("org.lwjgl:lwjgl-fmod:3.3.3")
 }
 
 tasks.withType(JavaCompile).configureEach {
     options.encoding = "UTF-8"
+}
+
+// Include FMOD classes directly in the JAR (without LWJGL system classes)
+jar {
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+
+    // Add FMOD classes directly to the JAR
+    from(configurations.fmodOnly.collect { zipTree(it) }) {
+        // Only include FMOD classes, not LWJGL system classes
+        include 'org/lwjgl/fmod/**'
+        // Exclude all module-info files to prevent conflicts
+        exclude '**/module-info.class'
+        exclude 'META-INF/versions/*/module-info.class'
+    }
+
+    // Global exclusions
+    exclude '**/module-info.class'
+    exclude 'META-INF/versions/*/module-info.class'
 }

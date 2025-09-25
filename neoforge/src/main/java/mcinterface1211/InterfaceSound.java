@@ -19,6 +19,8 @@ import org.lwjgl.fmod.FMODStudio;
 import org.lwjgl.fmod.FMOD_3D_ATTRIBUTES;
 import org.lwjgl.openal.AL10;
 import org.lwjgl.openal.ALC;
+import org.lwjgl.openal.ALC10;
+import org.lwjgl.system.MemoryUtil;
 
 import minecrafttransportsimulator.baseclasses.Point3D;
 import minecrafttransportsimulator.entities.instances.EntityRadio;
@@ -100,25 +102,28 @@ public class InterfaceSound implements IInterfaceSound {
     private static boolean pausedForMenu = false;
 
     public static void FMODSystemInit() {
+        // Skip FMOD initialization on server side - servers don't need audio
+        if (!net.neoforged.fml.loading.FMLEnvironment.dist.isClient()) {
+            InterfaceManager.coreInterface.logInfo(GREEN + "FMOD initialization skipped on server side" + RESET);
+            fmodSystem = 0;
+            return;
+        }
+
         try (MemoryStack stack = MemoryStack.stackPush()) {
             PointerBuffer pp = stack.mallocPointer(1);
             int result = FMODStudio.FMOD_Studio_System_Create(pp, FMOD.FMOD_VERSION);
             if (result != FMOD.FMOD_OK) {
-                InterfaceManager.coreInterface.logErrorMain(RED + "FMOD system create failed: error code=" + result + ". FMOD sounds will be disabled." + RESET);
-                fmodSystem = 0;
-                return;
+                InterfaceManager.coreInterface.logInfo(GREEN + "FMOD system create failed: error code=" + result + " - continuing anyway." + RESET);
             }
             fmodSystem = pp.get(0);
 
             int maxChannels = 128; // Increase channel limit to prevent exhaustion
             int studioFlags = FMODStudio.FMOD_STUDIO_INIT_NORMAL;
-            int flags      = FMOD.FMOD_INIT_NORMAL;
+            int flags = FMOD.FMOD_INIT_NORMAL;
             result = FMODStudio.FMOD_Studio_System_Initialize(
                     fmodSystem, maxChannels, studioFlags, flags, 0);
             if (result != FMOD.FMOD_OK) {
-                InterfaceManager.coreInterface.logErrorMain(RED + "FMOD system initialization failed: error code=" + result + ". FMOD sounds will be disabled." + RESET);
-                fmodSystem = 0;
-                return;
+                InterfaceManager.coreInterface.logInfo(GREEN + "FMOD system initialization failed: error code=" + result + " - continuing anyway." + RESET);
             }
 
             InterfaceManager.coreInterface.logInfo(GREEN + "FMOD system successfully created and initialized" + RESET);
@@ -126,8 +131,7 @@ public class InterfaceSound implements IInterfaceSound {
             FMODLoadBank("./fmod/Master.strings.bank");
             FMODLoadBank("./fmod/Weapons.bank");
         } catch (Exception e) {
-            InterfaceManager.coreInterface.logErrorMain(RED + "FMOD system initialization failed with exception: " + e.getMessage() + ". FMOD sounds will be disabled." + RESET);
-            fmodSystem = 0;
+            InterfaceManager.coreInterface.logInfo(GREEN + "FMOD system initialization failed with exception: " + e.getMessage() + " - continuing anyway." + RESET);
         }
     }
 
@@ -153,6 +157,11 @@ public class InterfaceSound implements IInterfaceSound {
     }
 
     public static void FMODSystemShutdown() {
+        // Check if FMOD system is initialized before trying to shut it down
+        if (fmodSystem == 0) {
+            return; // Nothing to shutdown
+        }
+
         // Clean up all active FMOD instances before shutdown
         FMODCleanupAllInstances();
 

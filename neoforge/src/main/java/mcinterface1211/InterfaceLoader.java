@@ -92,6 +92,17 @@ public class InterfaceLoader {
     public InterfaceLoader() {
         this.modEventBus = ModLoadingContext.get().getActiveContainer().getEventBus();
         this.gameDirectory = FMLPaths.GAMEDIR.get().toFile().getAbsolutePath();
+        
+        // Check for DynamicSurroundings very early to prevent FMOD conflicts
+        try {
+            Class.forName("org.orecruncher.dsurround.DynamicSurroundings");
+            System.out.println("DynamicSurroundings detected in constructor - FMOD libraries will not be loaded to prevent conflicts");
+            // Set a flag to skip FMOD loading
+            System.setProperty("mts.fmod.disabled", "true");
+        } catch (ClassNotFoundException e) {
+            // DynamicSurroundings not present, continue with FMOD
+        }
+        
         modEventBus.addListener(this::init);
         modEventBus.addListener(this::onPostConstruction);
         modEventBus.addListener(this::onRegisterCapabilities);
@@ -107,11 +118,19 @@ public class InterfaceLoader {
      */
     public void init(FMLConstructModEvent event) {
         try {
-            // Extract and load FMOD libraries from JAR
+            // Check if FMOD was disabled due to DynamicSurroundings detection
+            if ("true".equals(System.getProperty("mts.fmod.disabled"))) {
+                System.out.println("FMOD libraries loading skipped due to DynamicSurroundings detection");
+                return;
+            }
+            
+            // Only extract and load FMOD libraries - Minecraft handles LWJGL
             loadLibraryFromJar("/libraries/fmod.dll", "fmod");
             loadLibraryFromJar("/libraries/fmodstudio.dll", "fmodstudio");
+            System.out.println("FMOD native libraries loaded successfully");
         } catch (Exception e) {
-            System.err.println("Failed to load FMOD libraries: " + e.getMessage());
+            System.err.println("Failed to load native libraries: " + e.getMessage());
+            e.printStackTrace();
         }
         //Add registries.
         BuilderItem.ITEMS.register(modEventBus);
@@ -421,6 +440,7 @@ public class InterfaceLoader {
         }
     }
 
+
     private static void loadLibraryFromJar(String resourcePath, String libraryName) throws Exception {
         try (InputStream is = InterfaceLoader.class.getResourceAsStream(resourcePath)) {
             if (is == null) {
@@ -428,12 +448,15 @@ public class InterfaceLoader {
             }
 
             // Create temp file
-            Path tempDir = Files.createTempDirectory("fmod-native");
+            Path tempDir = Files.createTempDirectory("mts-fmod-libs");
+            tempDir.toFile().deleteOnExit();
+
             Path tempFile = tempDir.resolve(libraryName + ".dll");
+            tempFile.toFile().deleteOnExit();
 
             // Extract to temp file
             try (FileOutputStream fos = new FileOutputStream(tempFile.toFile())) {
-                byte[] buffer = new byte[1024];
+                byte[] buffer = new byte[8192];
                 int bytesRead;
                 while ((bytesRead = is.read(buffer)) != -1) {
                     fos.write(buffer, 0, bytesRead);
@@ -442,6 +465,7 @@ public class InterfaceLoader {
 
             // Load the library
             System.load(tempFile.toAbsolutePath().toString());
+            System.out.println("Successfully loaded: " + libraryName + ".dll");
         }
     }
 }

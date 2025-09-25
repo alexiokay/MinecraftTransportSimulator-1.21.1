@@ -134,9 +134,18 @@ public class CameraSystem {
             sittingSeat.getRiderInterpolatedOrientation(riderOrientation, partialTicks);
             cameraRotation.multiply(riderOrientation);
 
+            // TEST: Position-based zoom with fixed CameraMixin
+            CameraMode cameraMode = InterfaceManager.clientInterface.getCameraMode();
+            if (cameraMode != CameraMode.FIRST_PERSON && sittingSeat.zoomLevel != 0) {
+                // Use simple, obvious position offset for testing
+                System.out.println("DEBUG ZOOM: Applying position offset for zoomLevel=" + sittingSeat.zoomLevel);
+                // Move camera back by zoom level * 2 blocks (should be very visible)
+                cameraAdjustedPosition.add(0, 0, sittingSeat.zoomLevel * -2.0);
+                System.out.println("DEBUG ZOOM: Final cameraAdjustedPosition=" + cameraAdjustedPosition);
+            }
+
             // IMPORTANT: Apply camera mode-specific orientation changes
             // This is what makes front/back third-person modes behave differently
-            CameraMode cameraMode = InterfaceManager.clientInterface.getCameraMode();
             if (cameraMode == CameraMode.THIRD_PERSON_INVERTED) {
                 // For front-facing camera, rotate 180 degrees in Y
                 RotationMatrix flipMatrix = new RotationMatrix();
