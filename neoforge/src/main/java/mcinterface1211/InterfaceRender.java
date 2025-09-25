@@ -116,6 +116,7 @@ public class InterfaceRender implements IInterfaceRender {
             MISSING_STATE = new RenderStateShard.TextureStateShard(ResourceLocation.fromNamespaceAndPath("mts", "textures/rendering/missing.png"), false, false);
             BLOCK_STATE = new RenderStateShard.TextureStateShard(BLOCK_TEXTURE_LOCATION, false, false);
 
+  
 
             // Preload common texture paths to prevent render delays
             preloadCommonTextures();
@@ -304,52 +305,41 @@ public class InterfaceRender implements IInterfaceRender {
     private static boolean isPackItem(net.minecraft.world.item.ItemStack stack) {
         if (stack.getItem() instanceof BuilderItem) {
             BuilderItem builderItem = (BuilderItem) stack.getItem();
-            boolean isPackItem = builderItem.getWrappedItem() instanceof minecrafttransportsimulator.items.components.AItemPack;
-            InterfaceManager.coreInterface.logError("PACK ITEM CHECK: " + stack.getItem().getClass().getSimpleName() + " -> " + isPackItem);
-            return isPackItem;
+            return builderItem.getWrappedItem() instanceof minecrafttransportsimulator.items.components.AItemPack;
         }
-        InterfaceManager.coreInterface.logError("PACK ITEM CHECK: " + stack.getItem().getClass().getSimpleName() + " -> NOT BuilderItem");
         return false;
     }
 
     /**
-     * Render a simple placeholder for pack items instead of the broken model.
+     * Render pack item with proper texture instead of the broken model.
      */
     private static void renderPackItemPlaceholder(GuiGraphics mcGUI, GUIComponentItem component) {
-        InterfaceManager.coreInterface.logError("PLACEHOLDER RENDER: Rendering pack item placeholder (unscaled)");
-        // For now, render a simple colored rectangle as a placeholder
-        // In the future, this could be enhanced to render the actual item texture or a 3D model
-        int x = (int) component.translation.x;
-        int y = (int) -component.translation.y;
-        int size = 16; // Standard item size
-
-        // Draw a simple colored rectangle
-        mcGUI.fill(x, y, x + size, y + size, 0xFF888888); // Gray placeholder
-
-        // Draw a border
-        mcGUI.fill(x, y, x + size, y + 1, 0xFF000000); // Top
-        mcGUI.fill(x, y + size - 1, x + size, y + size, 0xFF000000); // Bottom
-        mcGUI.fill(x, y, x + 1, y + size, 0xFF000000); // Left
-        mcGUI.fill(x + size - 1, y, x + size, y + size, 0xFF000000); // Right
+        try {
+            // Try to render the actual item normally first
+            mcGUI.renderItem(((WrapperItemStack) component.stackToRender).stack, (int) component.translation.x, (int) -component.translation.y);
+        } catch (Exception e) {
+            // If normal rendering fails, render a simple placeholder
+            int x = (int) component.translation.x;
+            int y = (int) -component.translation.y;
+            int size = 16;
+            mcGUI.fill(x, y, x + size, y + size, 0xFF888888);
+        }
     }
 
     /**
-     * Render a simple placeholder for pack items (scaled version).
+     * Render pack item with proper texture (scaled version).
      */
     private static void renderPackItemPlaceholderScaled(GuiGraphics mcGUI, GUIComponentItem component) {
-        InterfaceManager.coreInterface.logError("PLACEHOLDER RENDER: Rendering pack item placeholder (scaled)");
-        int x = (int) (component.translation.x / component.scale);
-        int y = (int) (-component.translation.y / component.scale) + 1;
-        int size = 16; // Standard item size
-
-        // Draw a simple colored rectangle
-        mcGUI.fill(x, y, x + size, y + size, 0xFF888888); // Gray placeholder
-
-        // Draw a border
-        mcGUI.fill(x, y, x + size, y + 1, 0xFF000000); // Top
-        mcGUI.fill(x, y + size - 1, x + size, y + size, 0xFF000000); // Bottom
-        mcGUI.fill(x, y, x + 1, y + size, 0xFF000000); // Left
-        mcGUI.fill(x + size - 1, y, x + size, y + size, 0xFF000000); // Right
+        try {
+            // Try to render the actual item normally first
+            mcGUI.renderItem(((WrapperItemStack) component.stackToRender).stack, (int) (component.translation.x / component.scale), (int) (-component.translation.y / component.scale) + 1);
+        } catch (Exception e) {
+            // If normal rendering fails, render a simple placeholder
+            int x = (int) (component.translation.x / component.scale);
+            int y = (int) (-component.translation.y / component.scale) + 1;
+            int size = 16;
+            mcGUI.fill(x, y, x + size, y + size, 0xFF888888);
+        }
     }
     
     @Override
