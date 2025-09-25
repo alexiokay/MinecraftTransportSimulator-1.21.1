@@ -62,6 +62,15 @@ public class BuilderEntityLinkedSeat extends ABuilderEntityBase {
         if (entity != null) {
             //Check if the entity we are a seat on is still valid, or need to be set dead.
             if (!entity.isValid) {
+                // CRITICAL FIX: Ensure player is properly dismounted when vehicle becomes invalid
+                List<Entity> riders = getPassengers();
+                if (!riders.isEmpty()) {
+                    InterfaceManager.coreInterface.logError("SEAT RECOVERY: Vehicle became invalid but seat still has riders - force dismounting to prevent player getting stuck");
+                    for (Entity riderEntity : riders) {
+                        riderEntity.stopRiding();
+                        InterfaceManager.coreInterface.logError("SEAT RECOVERY: Force dismounted rider from invalid vehicle: " + riderEntity);
+                    }
+                }
                 discard();
             } else {
                 setPos(entity.position.x, entity.position.y, entity.position.z);
@@ -94,6 +103,15 @@ public class BuilderEntityLinkedSeat extends ABuilderEntityBase {
         		entity = worldWrapper.getEntity(entityUUID);
         	}else {
         		InterfaceManager.coreInterface.logError("Found a seat but no entity was found for it.  Did a pack change?");
+                // CRITICAL FIX: Ensure player is properly dismounted before discarding seat
+                List<Entity> riders = getPassengers();
+                if (!riders.isEmpty()) {
+                    InterfaceManager.coreInterface.logError("SEAT RECOVERY: Seat being discarded but still has riders - force dismounting to prevent player getting stuck");
+                    for (Entity riderEntity : riders) {
+                        riderEntity.stopRiding();
+                        InterfaceManager.coreInterface.logError("SEAT RECOVERY: Force dismounted rider: " + riderEntity);
+                    }
+                }
                 discard();
         	}
         }else if (loadFromSavedNBT) {

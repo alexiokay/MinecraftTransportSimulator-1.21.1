@@ -4,6 +4,7 @@ import java.util.UUID;
 
 import minecrafttransportsimulator.mcinterface.AWrapperWorld;
 import minecrafttransportsimulator.mcinterface.IWrapperNBT;
+import minecrafttransportsimulator.mcinterface.InterfaceManager;
 
 /**
  * Base entity class.  This class is the base for all in-game entities.  What these
@@ -92,6 +93,12 @@ public abstract class AEntityA_Base {
      */
     public void remove() {
         if (isValid) {
+            // CRITICAL DEBUG: Log who is removing entities and why
+            InterfaceManager.coreInterface.logError("ENTITY REMOVAL DEBUG: Entity " + getClass().getSimpleName() + " UUID " + uniqueUUID + " is being removed");
+            StackTraceElement[] trace = Thread.currentThread().getStackTrace();
+            for (int i = 1; i < Math.min(trace.length, 6); i++) {
+                InterfaceManager.coreInterface.logError("ENTITY REMOVAL DEBUG: Stack[" + i + "]: " + trace[i].getClassName() + "." + trace[i].getMethodName() + "(" + trace[i].getFileName() + ":" + trace[i].getLineNumber() + ")");
+            }
             isValid = false;
             world.removeEntity(this);
         }
