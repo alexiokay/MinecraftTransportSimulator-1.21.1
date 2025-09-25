@@ -781,6 +781,7 @@ public class WrapperWorld extends AWrapperWorld {
     }
 
     @Override
+    @SuppressWarnings("deprecation")
     public float getTemperature(Point3D position) {
         BlockPos pos = BlockPos.containing(position.x, position.y, position.z);
         return world.getBiome(pos).value().getTemperature(pos);
@@ -1192,7 +1193,7 @@ public class WrapperWorld extends AWrapperWorld {
                         }
 
                         // Check if player is fully loaded and chunk is available (minimum 5 ticks for stability)
-                        boolean playerReady = totalTicksWaited >= 5 && mcPlayer.hasPermissions(0) && mcPlayer.level().hasChunkAt(mcPlayer.blockPosition());
+                        boolean playerReady = totalTicksWaited >= 5 && mcPlayer.hasPermissions(0) && mcPlayer.level().isLoaded(mcPlayer.blockPosition());
 
                         if (++totalTicksWaited >= 5 && playerReady) {
                             IWrapperPlayer playerWrapper = WrapperPlayer.getWrapperFor(mcPlayer);
