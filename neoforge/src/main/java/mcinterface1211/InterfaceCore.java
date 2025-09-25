@@ -1,13 +1,8 @@
 package mcinterface1211;
 import net.minecraft.core.registries.Registries;
 
-import java.io.ByteArrayInputStream;
-import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.net.URL;
-import java.net.URLClassLoader;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -15,8 +10,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Stream;
-import java.util.jar.JarFile;
-import java.util.zip.ZipEntry;
 
 import minecrafttransportsimulator.items.components.AItemBase;
 import minecrafttransportsimulator.mcinterface.IInterfaceCore;
@@ -66,142 +59,50 @@ class InterfaceCore implements IInterfaceCore {
     
     @Override
     public InputStream getPackResource(String resource) {
+        // Extract mod ID from resource path like "/assets/mtsofficialpack/objmodels/..."
         int assetsIndexEnd = resource.indexOf("assets/") + "assets/".length();
         int modIDEnd = resource.indexOf("/", assetsIndexEnd + 1);
         String modID = resource.substring(assetsIndexEnd, modIDEnd);
 
-        // Skip resource manager to avoid circular dependency in PackResourcePack
-        // Fall through directly to ModContainer loading
+        // Convert to ResourceLocation format
+        String resourcePath = resource.substring(modIDEnd + 1); // Remove "/assets/modid/"
+        ResourceLocation resourceLocation = ResourceLocation.fromNamespaceAndPath(modID, resourcePath);
 
-        Optional<? extends ModContainer> optional = ModList.get().getModContainerById(modID);
-        if (optional.isPresent()) {
-            // In NeoForge 1.21.1, use the ModContainer's classloader directly for resource access
-            ModContainer container = optional.get();
-
-            // For content packs, try loading directly through the ModContainer's classloader
-            if (!modID.equals(InterfaceLoader.MODID)) {
-                try {
-                    // Use the ModContainer's class loader to load resources
-                    // This should work for content pack mods registered with NeoForge
-                    InputStream stream = container.getClass().getClassLoader().getResourceAsStream(resource);
-                    if (stream != null) {
-                        InterfaceManager.coreInterface.logError("RESOURCE DEBUG: Loaded resource from mod container: " + modID + " - " + resource);
-                        return stream;
-                    }
-                } catch (Exception e) {
-                    InterfaceManager.coreInterface.logError("RESOURCE DEBUG: Failed to load from mod container: " + modID + " - " + e.getMessage());
-                }
-
-                // If ModContainer classloader failed, try JAR loading for content packs
-                if (!modID.equals(InterfaceLoader.MODID)) {
-                    InputStream packStream = loadResourceFromContentPacks(resource, modID);
-                    if (packStream != null) {
-                        return packStream;
-                    }
-                }
-            }
-
-            // Original loading methods as fallback
+        // Try using Minecraft's client-side resource manager if available
+        if (FMLEnvironment.dist == Dist.CLIENT) {
             try {
-                // First try loading through the container's mod instance if available
-                Class<?> modClass = Class.forName(container.getModInfo().getModId() + "." + container.getModInfo().getDisplayName().replaceAll("\\s+", ""));
-                InputStream stream = modClass.getResourceAsStream(resource);
-                if (stream != null) {
-                    return stream;
+                var resourceManager = Minecraft.getInstance().getResourceManager();
+                var resourceResource = resourceManager.getResource(resourceLocation);
+                if (resourceResource.isPresent()) {
+                    return resourceResource.get().open();
                 }
-            } catch (ClassNotFoundException e) {
-                // Fall through to other methods
-            }
-
-            if (modID.equals(InterfaceLoader.MODID)) {
-                //For dev builds, the core files aren't in the main jar yet and are in their own compiled one.
-                //This requires us to check a class of that jar vs the mod jar for the resource.
-                return InterfaceManager.class.getResourceAsStream(resource);
-            }
-        } else {
-            // Check for external content packs in the mods directory
-            InputStream packStream = loadResourceFromContentPacks(resource, modID);
-            if (packStream != null) {
-                return packStream;
+            } catch (Exception e) {
+                // Fall through to ModContainer loading
             }
         }
-        //Try to get a Minecraft texture, we use the classloader of the block class, since it's common to servers and clients.
+
+        // Use NeoForge's ModContainer system as fallback
+        Optional<? extends ModContainer> optional = ModList.get().getModContainerById(modID);
+        if (optional.isPresent()) {
+            ModContainer container = optional.get();
+
+            // Try the container's classloader
+            ClassLoader classLoader = container.getClass().getClassLoader();
+            InputStream stream = classLoader.getResourceAsStream(resource);
+            if (stream != null) {
+                return stream;
+            }
+
+            // For MTS core mod in dev environment
+            if (modID.equals(InterfaceLoader.MODID)) {
+                return InterfaceManager.class.getResourceAsStream(resource);
+            }
+        }
+
+        // Final fallback
         return Blocks.AIR.getClass().getResourceAsStream(resource);
     }
 
-    /**
-     * Loads resources from external content pack JARs.
-     * This handles content packs that are not registered as mods but placed in the mods directory.
-     */
-    private InputStream loadResourceFromContentPacks(String resource, String modID) {
-        try {
-            // For development environment, check the MTSOfficialPack directory directly
-            // This is needed because during early mod loading, the pack isn't available as a JAR yet
-            if ("mtsofficialpack".equals(modID)) {
-                File packDir = new File("../MTSOfficialPack-1.21.1/src/main/resources");
-                if (!packDir.exists()) {
-                    // Try environment variable or system property for pack location
-                    String packPath = System.getProperty("mts.pack.path", System.getenv("MTS_PACK_PATH"));
-                    if (packPath != null) {
-                        packDir = new File(packPath);
-                    }
-                }
-
-                if (packDir.exists()) {
-                    // Remove leading slash if present
-                    String resourcePath = resource.startsWith("/") ? resource.substring(1) : resource;
-                    // If resource starts with "assets/", remove it since it's already in the resources folder
-                    if (resourcePath.startsWith("assets/")) {
-                        resourcePath = resourcePath.substring("assets/".length());
-                        // Now add "assets/" back as part of the directory structure
-                        resourcePath = "assets/" + resourcePath;
-                    }
-
-                    File resourceFile = new File(packDir, resourcePath);
-                    if (resourceFile.exists()) {
-                        try {
-                            InterfaceLoader.LOGGER.info("MTS: Loading resource from development pack directory: {}", resource);
-                            return new FileInputStream(resourceFile);
-                        } catch (IOException e) {
-                            InterfaceLoader.LOGGER.warn("MTS: Failed to read from development pack: {}", e.getMessage());
-                        }
-                    }
-                }
-            }
-
-            // Get the mods directory - this works for both dev and production environments
-            File modsDir = new File("run/mods");
-            if (!modsDir.exists()) {
-                // Fallback for different directory structures
-                modsDir = new File("mods");
-            }
-
-            if (modsDir.exists() && modsDir.isDirectory()) {
-                // Look for JAR files that might contain the modID
-                for (File file : modsDir.listFiles()) {
-                    if (file.isFile() && file.getName().toLowerCase().endsWith(".jar")) {
-                        try (JarFile jarFile = new JarFile(file)) {
-                            // Check if this JAR contains resources for our modID
-                            ZipEntry entry = jarFile.getEntry(resource);
-                            if (entry != null) {
-                                InterfaceLoader.LOGGER.info("MTS: Found resource {} in content pack {}", resource, file.getName());
-                                // Read the data into memory to avoid closed JarFile issues
-                                try (InputStream entryStream = jarFile.getInputStream(entry)) {
-                                    byte[] data = entryStream.readAllBytes();
-                                    return new ByteArrayInputStream(data);
-                                }
-                            }
-                        } catch (IOException e) {
-                            InterfaceLoader.LOGGER.warn("MTS: Failed to read content pack {}: {}", file.getName(), e.getMessage());
-                        }
-                    }
-                }
-            }
-        } catch (Exception e) {
-            InterfaceLoader.LOGGER.error("MTS: Error loading resource {} from content packs: {}", resource, e.getMessage());
-        }
-        return null;
-    }
 
     @Override
     public void logError(String message) {
