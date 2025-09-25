@@ -1,8 +1,11 @@
 package mcinterface1211;
 
 import java.io.File;
+import java.io.InputStream;
+import java.io.FileOutputStream;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -103,10 +106,13 @@ public class InterfaceLoader {
      * 
      */
     public void init(FMLConstructModEvent event) {
-        String dir = System.getProperty("fmod.nativesDir", "C:/sources/MinecraftTransportSimulator-NeoForge/neoforge/run/natives");
-        Path n = Paths.get(dir);
-        System.load(n.resolve("fmod.dll").toString());
-        System.load(n.resolve("fmodstudio.dll").toString());
+        try {
+            // Extract and load FMOD libraries from JAR
+            loadLibraryFromJar("/libraries/fmod.dll", "fmod");
+            loadLibraryFromJar("/libraries/fmodstudio.dll", "fmodstudio");
+        } catch (Exception e) {
+            System.err.println("Failed to load FMOD libraries: " + e.getMessage());
+        }
         //Add registries.
         BuilderItem.ITEMS.register(modEventBus);
         BuilderBlock.BLOCKS.register(modEventBus);
@@ -412,6 +418,30 @@ public class InterfaceLoader {
                     InterfaceManager.coreInterface.logError("RESOURCE PACK: Exception creating content pack resource provider: " + e.getMessage());
                 }
             });
+        }
+    }
+
+    private static void loadLibraryFromJar(String resourcePath, String libraryName) throws Exception {
+        try (InputStream is = InterfaceLoader.class.getResourceAsStream(resourcePath)) {
+            if (is == null) {
+                throw new RuntimeException("Library not found in JAR: " + resourcePath);
+            }
+
+            // Create temp file
+            Path tempDir = Files.createTempDirectory("fmod-native");
+            Path tempFile = tempDir.resolve(libraryName + ".dll");
+
+            // Extract to temp file
+            try (FileOutputStream fos = new FileOutputStream(tempFile.toFile())) {
+                byte[] buffer = new byte[1024];
+                int bytesRead;
+                while ((bytesRead = is.read(buffer)) != -1) {
+                    fos.write(buffer, 0, bytesRead);
+                }
+            }
+
+            // Load the library
+            System.load(tempFile.toAbsolutePath().toString());
         }
     }
 }
