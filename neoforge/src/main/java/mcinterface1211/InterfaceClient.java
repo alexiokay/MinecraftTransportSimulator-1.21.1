@@ -8,6 +8,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
 
 import minecrafttransportsimulator.baseclasses.Point3D;
 import minecrafttransportsimulator.entities.instances.EntityFluidTank;
@@ -248,7 +249,8 @@ public class InterfaceClient implements IInterfaceClient {
                     //Handle controls.  This has to happen prior to vehicle updates to ensure click handling is based on current position of the player.
                     ControlSystem.controlGlobal(player);
                     if (((WrapperPlayer) player).player.tickCount % 100 == 0) {
-                        if (!InterfaceManager.clientInterface.isGUIOpen() && !PackParser.arePacksPresent()) {
+                        // Check if packs are actually missing (not just still loading)
+                        if (!InterfaceManager.clientInterface.isGUIOpen() && !areContentPacksAvailable()) {
                             new GUIPackMissing();
                         }
                     }
@@ -317,5 +319,27 @@ public class InterfaceClient implements IInterfaceClient {
                 }
             }
         }
+    }
+
+    /**
+     * Smarter pack detection that considers both packItemMap and pack IDs.
+     * Returns true if content packs are available, false only if definitely missing.
+     */
+    private static boolean areContentPacksAvailable() {
+        // If traditional check passes, packs are definitely available
+        if (PackParser.arePacksPresent()) {
+            return true;
+        }
+
+        // If pack IDs exist beyond core mod, packs are being processed
+        Set<String> packIDs = PackParser.getAllPackIDs();
+        for (String packID : packIDs) {
+            if (!packID.equals(InterfaceLoader.MODID)) {
+                return true; // Found non-core pack ID, so packs exist
+            }
+        }
+
+        // No content packs found
+        return false;
     }
 }

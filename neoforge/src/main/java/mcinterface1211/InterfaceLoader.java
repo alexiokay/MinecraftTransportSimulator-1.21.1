@@ -65,8 +65,6 @@ import net.neoforged.neoforge.client.event.RegisterClientReloadListenersEvent;
 import net.neoforged.neoforge.event.AddPackFindersEvent;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.config.ModConfig;
-import net.neoforged.neoforge.client.gui.IConfigScreenFactory;
-import net.neoforged.neoforge.client.gui.ConfigurationScreen;
 
 /**
  * Loader interface for the mod.  This class is not actually an interface, unlike everything else.
@@ -100,10 +98,16 @@ public class InterfaceLoader {
         // Register config for proper NeoForge config GUI using the correct method
         container.registerConfig(ModConfig.Type.CLIENT, MTSConfig.SPEC);
 
-        // Register config screen factory to make the config button clickable
-        container.registerExtensionPoint(IConfigScreenFactory.class, ConfigurationScreen::new);
-
-        System.out.println("MTS Config registered using container.registerConfig with screen factory");
+        // Register config screen factory only on client side
+        if (FMLEnvironment.dist.isClient()) {
+            try {
+                // Use reflection to avoid direct client-only imports
+                Class.forName("mcinterface1211.ClientConfigRegistration").getMethod("registerConfigScreen", ModContainer.class).invoke(null, container);
+                System.out.println("MTS Config screen factory registered for client");
+            } catch (Exception e) {
+                System.err.println("Failed to register config screen factory: " + e.getMessage());
+            }
+        }
 
         // Check for DynamicSurroundings very early to prevent FMOD conflicts
         try {
@@ -172,28 +176,43 @@ public class InterfaceLoader {
         //Init config
         ConfigSystem.loadFromDisk(isClient);
 
-        //Initialize config bridge to sync NeoForge config with MTS settings
-        ConfigBridge.initializeConfigBridge();
+        //Initialize config bridge to sync NeoForge config with MTS settings (client only)
+        if (isClient) {
+            ConfigBridge.initializeConfigBridge();
+        }
 
         //Parse packs.  Look though default game directory and file runtime
         //Some systems don't use the "proper" game directory for mods so we need to look in the file directory too
+        //Also check for AutoModpack directories where mods may be downloaded
         List<File> packDirectories = new ArrayList<>();
+
+        // Standard mods directory
         File modDirectory = new File(gameDirectory, "mods");
         if (modDirectory.exists()) {
             packDirectories.add(modDirectory);
         }
+
+        // AutoModpack directory - recursively scan all subdirectories
+        File autoModpackDirectory = new File(gameDirectory, "automodpack");
+        if (autoModpackDirectory.exists()) {
+            addAllDirectoriesRecursively(autoModpackDirectory, packDirectories);
+        }
+
+        // Runtime file directory (where this mod is located)
         try {
             modDirectory = ModList.get().getModFileById(MODID).getFile().getFilePath().getParent().toFile().getCanonicalFile();
+            if (modDirectory.exists()) {
+                packDirectories.add(modDirectory);
+            }
         } catch (Exception e) {
-        } //Do nothing, this won't happen.
-        if (modDirectory.exists()) {
-            packDirectories.add(modDirectory);
+            // Do nothing, this won't happen
         }
+
         if (!packDirectories.isEmpty()) {
             PackParser.addDefaultItems();
             PackParser.parsePacks(packDirectories);
         } else {
-            InterfaceManager.coreInterface.logError("Could not find mods directory!  Checked game directory: " + gameDirectory + " and runtime file directory:" + modDirectory);
+            InterfaceManager.coreInterface.logError("Could not find any mod directories! Checked game directory: " + gameDirectory + " for 'mods' and 'automodpack' folders");
         }
 
         //Set pack IDs.
@@ -455,6 +474,16 @@ public class InterfaceLoader {
         }
     }
 
+
+    private static void addAllDirectoriesRecursively(File directory, List<File> packDirectories) {
+        packDirectories.add(directory);
+        File[] subdirs = directory.listFiles(File::isDirectory);
+        if (subdirs != null) {
+            for (File subdir : subdirs) {
+                addAllDirectoriesRecursively(subdir, packDirectories);
+            }
+        }
+    }
 
     private static void loadLibraryFromJar(String resourcePath, String libraryName) throws Exception {
         try (InputStream is = InterfaceLoader.class.getResourceAsStream(resourcePath)) {
