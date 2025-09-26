@@ -1,5 +1,45 @@
 {
-  "entries": {
+    "_comment": "Translated by Eskir",
+    "mts.configuration.Audio": "Audio-Einstellungen",
+    "mts.configuration.Controls": "Steuerungseinstellungen",
+    "mts.configuration.General": "Allgemeine Einstellungen",
+    "mts.configuration.HUD": "HUD-Einstellungen",
+    "mts.configuration.Physics": "Fahrzeugphysik-Einstellungen",
+    "mts.configuration.Rendering": "Rendering-Einstellungen",
+
+    "config.audio.error_code": "FMOD-Fehlercode",
+    "config.audio.fmod_enabled": "FMOD-Audio aktivieren",
+    "config.audio.fmod_status": "FMOD-Status",
+    "config.audio.header": "Audioeinstellungen",
+    "config.audio.system": "Aktives Audiosystem",
+    "config.controls.auto_start_engines": "Motoren automatisch starten",
+    "config.controls.auto_turn_signals": "Automatische Blinker",
+    "config.controls.header": "Steuerungseinstellungen",
+    "config.controls.joystick_enabled": "Joystick-Unterstützung aktivieren",
+    "config.controls.mouse_yoke": "Maus als Flugzeugsteuerhorn",
+    "config.controls.radio_volume": "Radiolautstärke",
+    "config.controls.simple_throttle": "Einfacher Schubmodus",
+    "config.controls.sound_volume": "Tonlautstärke",
+    "config.general.damage_system": "Schadenssystem aktivieren",
+    "config.general.dev_mode": "Entwicklermodus",
+    "config.general.fuel_system": "Kraftstoffsystem aktivieren",
+    "config.general.header": "Allgemeine Einstellungen",
+    "config.hud.full_hud_1p": "Vollständiges HUD in der Ego-Perspektive",
+    "config.hud.full_hud_3p": "Vollständiges HUD in der Third-Person-Perspektive",
+    "config.hud.header": "HUD-Einstellungen",
+    "config.hud.render_hud_1p": "HUD in der Ego-Perspektive anzeigen",
+    "config.hud.render_hud_3p": "HUD in der Third-Person-Perspektive anzeigen",
+    "config.physics.aircraft_speed_factor": "Flugzeug-Geschwindigkeitsfaktor",
+    "config.physics.car_speed_factor": "Auto-Geschwindigkeitsfaktor",
+    "config.physics.gravity_factor": "Schwerkraftfaktor",
+    "config.physics.header": "Fahrzeug-Physikeinstellungen",
+    "config.rendering.fancy_lights": "Aufwendige Lichteffekte",
+    "config.rendering.header": "Renderingeinstellungen",
+    "config.rendering.render_distance": "Fahrzeug-Sichtweite",
+    "config.rendering.transparent_windows": "Transparente Fenster",
+
+
+
     "mts.invisible_seat.subDescription": "",
     "mts.invisible_seat.description": "",
     "mts.invisible_seat.name": "Unsichtbarer Sitz (NICHT VERWENDEN!)",
@@ -439,5 +479,4 @@
     "input.turnsignal_l": "LinksBlinken",
     "sytstem.soundslot": "IMMERSIVE VEHICLES ERROR: Sound-Abspielung fehlgeschlagen, keine Sound-Slots verfügbar. Eine andere Mod scheint alle Slots zu besetzen! Falls Immersive Railroading installiert ist, setze 'override sound channels' zu 'false' im Config der Mod. Wenn GregTech installiert ist, setze die 'maxNumSounds' auf einen geringeren Wert. Dynamic Surrondings und Optifine könnten auch die Ursache sein. Wenn die vorgeschlagenen Methoden nicht funktionieren, kontaktiere uns. Sounds werden nicht mehr abgespielt.",
     "sytstem.debug": "%s"
-  }
 }

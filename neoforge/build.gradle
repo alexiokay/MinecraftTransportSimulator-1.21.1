@@ -25,6 +25,11 @@ repositories {
         name "KosmX's maven"
         url 'https://maven.kosmx.dev/'
     }
+    // Configured maven
+    maven {
+        name = "Curse Maven"
+        url = "https://cursemaven.com/"
+    }
 }
 
 //Configuration that holds jars to include in the jar
@@ -63,11 +68,12 @@ neoForge {
     }
 }
 
-//Automatically copy mccore textures during build
+//Automatically copy mccore assets during build
 processResources {
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
     from(project(":mccore").sourceSets.main.resources.srcDirs) {
         include "assets/mts/textures/**"
+        include "assets/mts/lang/**"
     }
 }
 
@@ -94,6 +100,8 @@ dependencies {
     //PlayerAnimator API for player model animations - DISABLED due to conflicts
     //implementation "dev.kosmx.player-anim:player-animation-lib-forge:2.0.1+1.21.1"
     runtimeOnly "mezz.jei:jei-1.21.1-neoforge:19.22.1.316"
+
+    // Removed Configured dependency - using native NeoForge config GUI instead
 
     // FMOD bindings - back to 3.3.3, focus on working in dev mode first
     compileOnly("org.lwjgl:lwjgl-fmod:3.3.3")

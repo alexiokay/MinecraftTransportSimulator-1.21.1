@@ -24,6 +24,7 @@ import org.lwjgl.system.MemoryUtil;
 
 import minecrafttransportsimulator.baseclasses.Point3D;
 import minecrafttransportsimulator.entities.instances.EntityRadio;
+import minecrafttransportsimulator.jsondefs.JSONSound;
 import minecrafttransportsimulator.mcinterface.IInterfaceSound;
 import minecrafttransportsimulator.mcinterface.IWrapperPlayer;
 import minecrafttransportsimulator.mcinterface.InterfaceManager;
@@ -52,6 +53,13 @@ public class InterfaceSound implements IInterfaceSound {
      * Flag for game paused state.  Gets set when the game is paused.
      **/
     private static boolean isSystemPaused;
+
+    /**
+     * Current FMOD status for real-time config display
+     **/
+    private static String currentFMODStatus = "Not initialized";
+    private static String currentAudioSystem = "Pending";
+    private static int currentFMODErrorCode = -1;
 
     /**
      * Map of String-based file-names to Integer pointers to buffer locations.  Used for loading sounds into
@@ -99,6 +107,7 @@ public class InterfaceSound implements IInterfaceSound {
     private static final String RESET  = "\u001B[0m";
     private static final String GREEN  = "\u001B[32m";
     public static final String RED    = "\u001B[31m";
+    private static final String YELLOW = "\u001B[33m";
     private static boolean pausedForMenu = false;
 
     public static void FMODSystemInit() {
@@ -106,6 +115,10 @@ public class InterfaceSound implements IInterfaceSound {
         if (!net.neoforged.fml.loading.FMLEnvironment.dist.isClient()) {
             InterfaceManager.coreInterface.logInfo(GREEN + "FMOD initialization skipped on server side" + RESET);
             fmodSystem = 0;
+            currentFMODStatus = "Skipped (server side)";
+            currentAudioSystem = "None";
+            currentFMODErrorCode = 0;
+            ConfigBridge.updateFMODStatus(currentFMODStatus, currentAudioSystem, currentFMODErrorCode);
             return;
         }
 
@@ -114,24 +127,63 @@ public class InterfaceSound implements IInterfaceSound {
             int result = FMODStudio.FMOD_Studio_System_Create(pp, FMOD.FMOD_VERSION);
             if (result != FMOD.FMOD_OK) {
                 InterfaceManager.coreInterface.logInfo(GREEN + "FMOD system create failed: error code=" + result + " - continuing anyway." + RESET);
+                currentFMODStatus = "Create failed";
+                currentAudioSystem = "OpenAL (fallback)";
+                currentFMODErrorCode = result;
+                ConfigBridge.updateFMODStatus(currentFMODStatus, currentAudioSystem, currentFMODErrorCode);
+                return;
             }
             fmodSystem = pp.get(0);
 
+            // Get low-level system to configure output type before initialization
+            PointerBuffer lowLevelSystem = stack.mallocPointer(1);
+            result = FMODStudio.FMOD_Studio_System_GetCoreSystem(fmodSystem, lowLevelSystem);
+            if (result == FMOD.FMOD_OK) {
+                long coreSystem = lowLevelSystem.get(0);
+                // Set output type to WASAPI for better shared mode support
+                result = FMOD.FMOD_System_SetOutput(coreSystem, FMOD.FMOD_OUTPUTTYPE_WASAPI);
+                if (result != FMOD.FMOD_OK) {
+                    InterfaceManager.coreInterface.logInfo(GREEN + "FMOD failed to set WASAPI output (code=" + result + "), using default output" + RESET);
+                } else {
+                    InterfaceManager.coreInterface.logInfo(GREEN + "FMOD using WASAPI output for shared mode compatibility" + RESET);
+                }
+            }
+
             int maxChannels = 128; // Increase channel limit to prevent exhaustion
             int studioFlags = FMODStudio.FMOD_STUDIO_INIT_NORMAL;
-            int flags = FMOD.FMOD_INIT_NORMAL;
+            // Use flags that allow hardware sharing with other audio systems
+            int flags = FMOD.FMOD_INIT_NORMAL | FMOD.FMOD_INIT_MIX_FROM_UPDATE;
             result = FMODStudio.FMOD_Studio_System_Initialize(
                     fmodSystem, maxChannels, studioFlags, flags, 0);
             if (result != FMOD.FMOD_OK) {
                 InterfaceManager.coreInterface.logInfo(GREEN + "FMOD system initialization failed: error code=" + result + " - continuing anyway." + RESET);
+                currentFMODStatus = "Initialize failed";
+                currentAudioSystem = "OpenAL (fallback)";
+                currentFMODErrorCode = result;
+                ConfigBridge.updateFMODStatus(currentFMODStatus, currentAudioSystem, currentFMODErrorCode);
+                fmodSystem = 0;
+                return;
             }
 
             InterfaceManager.coreInterface.logInfo(GREEN + "FMOD system successfully created and initialized" + RESET);
-            FMODLoadBank("./fmod/Master.bank");
-            FMODLoadBank("./fmod/Master.strings.bank");
-            FMODLoadBank("./fmod/Weapons.bank");
+            currentFMODStatus = "Successfully initialized";
+            currentAudioSystem = "FMOD";
+            currentFMODErrorCode = 0;
+            ConfigBridge.updateFMODStatus(currentFMODStatus, currentAudioSystem, currentFMODErrorCode);
+
+            // Load bank files from direct file paths (original working method)
+            FMODLoadBank("fmod/Master.bank");
+            FMODLoadBank("fmod/Master.strings.bank");
+            FMODLoadBank("fmod/Weapons.bank");
+
+            InterfaceManager.coreInterface.logInfo(GREEN + "FMOD system ready with events: test_event, test_voice, alarm, explosion, m1919, tank_shot, vehicle_explosion, jet_flyby, ship_alarm, etc." + RESET);
         } catch (Exception e) {
             InterfaceManager.coreInterface.logInfo(GREEN + "FMOD system initialization failed with exception: " + e.getMessage() + " - continuing anyway." + RESET);
+            currentFMODStatus = "Exception: " + e.getMessage();
+            currentAudioSystem = "OpenAL (fallback)";
+            currentFMODErrorCode = -1;
+            ConfigBridge.updateFMODStatus(currentFMODStatus, currentAudioSystem, currentFMODErrorCode);
+            fmodSystem = 0;
         }
     }
 
@@ -168,7 +220,15 @@ public class InterfaceSound implements IInterfaceSound {
         int result = FMODStudio.FMOD_Studio_System_Release(fmodSystem);
         if (result != FMOD.FMOD_OK) {
             InterfaceManager.coreInterface.logErrorMain(RED + "FMOD system release failed: error code=" + result + RESET);
-            //System.err.println("FMOD release failed: result=" + result);
+            currentFMODStatus = "Shutdown failed";
+            currentAudioSystem = "Unknown";
+            currentFMODErrorCode = result;
+            ConfigBridge.updateFMODStatus(currentFMODStatus, currentAudioSystem, currentFMODErrorCode);
+        } else {
+            currentFMODStatus = "Shutdown";
+            currentAudioSystem = "None";
+            currentFMODErrorCode = 0;
+            ConfigBridge.updateFMODStatus(currentFMODStatus, currentAudioSystem, currentFMODErrorCode);
         }
         fmodSystem = 0;
     }
@@ -230,6 +290,73 @@ public class InterfaceSound implements IInterfaceSound {
         }
     }
 
+    private static void FMODLoadBankFromResource(String resourcePath) {
+        try {
+            // Try multiple strategies to load the bank file from resources
+            InputStream bankStream = null;
+
+            // Strategy 1: Try direct class loader
+            bankStream = InterfaceSound.class.getResourceAsStream(resourcePath);
+
+            // Strategy 2: Try context class loader if first failed
+            if (bankStream == null) {
+                ClassLoader contextClassLoader = Thread.currentThread().getContextClassLoader();
+                bankStream = contextClassLoader.getResourceAsStream(resourcePath.substring(1)); // Remove leading /
+            }
+
+            // Strategy 3: Try the core module's class loader
+            if (bankStream == null) {
+                bankStream = InterfaceManager.coreInterface.getClass().getResourceAsStream(resourcePath);
+            }
+
+            if (bankStream == null) {
+                InterfaceManager.coreInterface.logErrorMain(RED + "FMOD bank resource not found: " + resourcePath + RESET);
+                return;
+            }
+
+            // Read all bytes from the input stream
+            byte[] bankData = bankStream.readAllBytes();
+            bankStream.close();
+
+            InterfaceManager.coreInterface.logInfo(GREEN + "FMOD loaded bank data from resource: " + resourcePath + ", size=" + bankData.length + " bytes" + RESET);
+
+            // Extract to temporary file and use LoadBankFile method
+            String fileName = resourcePath.substring(resourcePath.lastIndexOf('/') + 1);
+            java.io.File tempFile = new java.io.File(System.getProperty("java.io.tmpdir"), "fmod_" + fileName);
+
+            try (java.io.FileOutputStream fos = new java.io.FileOutputStream(tempFile)) {
+                fos.write(bankData);
+            }
+
+            InterfaceManager.coreInterface.logInfo(GREEN + "FMOD extracted bank to temp file: " + tempFile.getAbsolutePath() + RESET);
+
+            // Use LoadBankFile method like the original working implementation
+            try (MemoryStack stack = MemoryStack.stackPush()) {
+                PointerBuffer bankPtr = stack.mallocPointer(1);
+                int result = FMODStudio.FMOD_Studio_System_LoadBankFile(
+                        fmodSystem,
+                        stack.UTF8(tempFile.getAbsolutePath(), true),
+                        FMODStudio.FMOD_STUDIO_LOAD_BANK_NORMAL,
+                        bankPtr
+                );
+
+                if (result == FMOD.FMOD_OK) {
+                    InterfaceManager.coreInterface.logInfo(GREEN + "FMOD system successfully loaded bank from resource: " + resourcePath + " via temp file" + RESET);
+                } else {
+                    InterfaceManager.coreInterface.logErrorMain(RED + "FMOD system failed to load bank from resource: " + resourcePath + ", error code=" + result + RESET);
+                }
+            }
+
+            // Clean up temp file
+            tempFile.deleteOnExit();
+
+        } catch (Exception e) {
+            InterfaceManager.coreInterface.logErrorMain(RED + "Exception loading FMOD bank from resource: " + resourcePath + ", error: " + e.getMessage() + RESET);
+        }
+    }
+
+
+
     public void FMODPlaySoundEvent(SoundInstance sound) {
         // Check if FMOD system is initialized - if not, fallback to OpenAL
         if (fmodSystem == 0) {
@@ -278,7 +405,9 @@ public class InterfaceSound implements IInterfaceSound {
                     descPtr
             );
             if (result != FMOD.FMOD_OK) {
-                InterfaceManager.coreInterface.logErrorMain(RED + "FMOD system failed to find event: " + '"' + fmodEventName + '"' + ", error code=" + result + RESET);
+                InterfaceManager.coreInterface.logErrorMain(RED + "FMOD system failed to find event: " + '"' + fmodEventName + '"' + ", error code=" + result + ", falling back to OpenAL" + RESET);
+                // Fallback to original MTS sound system - exactly like before FMOD
+                playQuickSound(sound);
                 return;
             }
             long description = descPtr.get(0);
@@ -784,5 +913,51 @@ public class InterfaceSound implements IInterfaceSound {
             isSystemPaused = false;
             update();
         }
+    }
+
+    /**
+     * Gets the current FMOD status for real-time config display.
+     */
+    public static String getCurrentFMODStatus() {
+        return currentFMODStatus;
+    }
+
+    /**
+     * Gets the current audio system for real-time config display.
+     */
+    public static String getCurrentAudioSystem() {
+        return currentAudioSystem;
+    }
+
+    /**
+     * Smart sound playing method that tries FMOD first, automatically falls back to original MTS sounds.
+     * If eventName is provided, attempts FMOD. FMODPlaySoundEvent() already handles fallback to OpenAL.
+     * If no eventName, uses original MTS sound system.
+     *
+     * @param sound The sound instance to play
+     * @param eventName The FMOD event name (can be null for non-FMOD sounds)
+     * @return true if FMOD was attempted, false if original system was used
+     */
+    public boolean playSmartSound(SoundInstance sound, String eventName) {
+        // If we have an eventName, try FMOD (it will auto-fallback to OpenAL if FMOD unavailable)
+        if (eventName != null && !eventName.isEmpty()) {
+            JSONSound fmodSoundDef = new JSONSound();
+            fmodSoundDef.eventName = eventName;
+            SoundInstance fmodSound = new SoundInstance(sound.entity, fmodSoundDef);
+
+            FMODPlaySoundEvent(fmodSound); // This method already handles fallback!
+            return true; // Attempted FMOD (may have fallen back internally)
+        } else {
+            // No eventName provided - use original MTS sound system
+            playQuickSound(sound);
+            return false; // Used original system
+        }
+    }
+
+    /**
+     * Gets the current FMOD error code for real-time config display.
+     */
+    public static int getCurrentFMODErrorCode() {
+        return currentFMODErrorCode;
     }
 }

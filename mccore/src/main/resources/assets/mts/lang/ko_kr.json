@@ -1,5 +1,46 @@
 {
-  "entries": {
+    "_comment": "Translated by hand0604",
+    "mts.configuration.Audio": "오디오 설정",
+    "mts.configuration.Controls": "컨트롤 설정",
+    "mts.configuration.General": "일반 설정",
+    "mts.configuration.HUD": "HUD 설정",
+    "mts.configuration.Physics": "차량 물리 설정",
+    "mts.configuration.Rendering": "렌더링 설정",
+    
+    "config.audio.error_code": "FMOD 오류 코드",
+    "config.audio.fmod_enabled": "FMOD 오디오 활성화",
+    "config.audio.fmod_status": "FMOD 상태",
+    "config.audio.header": "오디오 설정",
+    "config.audio.system": "활성 오디오 시스템",
+    "config.controls.auto_start_engines": "엔진 자동 시동",
+    "config.controls.auto_turn_signals": "자동 방향지시등",
+    "config.controls.header": "조작 설정",
+    "config.controls.joystick_enabled": "조이스틱 지원 활성화",
+    "config.controls.mouse_yoke": "마우스를 조종간으로 사용",
+    "config.controls.radio_volume": "라디오 볼륨",
+    "config.controls.simple_throttle": "간단 스로틀 모드",
+    "config.controls.sound_volume": "사운드 볼륨",
+    "config.general.damage_system": "데미지 시스템 활성화",
+    "config.general.dev_mode": "개발자 모드",
+    "config.general.fuel_system": "연료 시스템 활성화",
+    "config.general.header": "일반 설정",
+    "config.hud.full_hud_1p": "1인칭 전체 HUD",
+    "config.hud.full_hud_3p": "3인칭 전체 HUD",
+    "config.hud.header": "HUD 설정",
+    "config.hud.render_hud_1p": "1인칭에서 HUD 표시",
+    "config.hud.render_hud_3p": "3인칭에서 HUD 표시",
+    "config.physics.aircraft_speed_factor": "항공기 속도 계수",
+    "config.physics.car_speed_factor": "자동차 속도 계수",
+    "config.physics.gravity_factor": "중력 계수",
+    "config.physics.header": "차량 물리 설정",
+    "config.rendering.fancy_lights": "고급 조명 효과",
+    "config.rendering.header": "렌더링 설정",
+    "config.rendering.render_distance": "차량 렌더링 거리",
+    "config.rendering.transparent_windows": "투명 창문",
+
+
+    
+    
     "mts.invisible_seat.subDescription": "",
     "mts.invisible_seat.description": "",
     "mts.invisible_seat.name": "투명 좌석 (사용 금지!)",
@@ -471,5 +512,5 @@
     "sytstem.soundslot": "IMMERSIVE VEHICLES 오류: 사운드를 재생하려 했지만 사용할 수 있는 사운드 슬롯이 없다는 응답을 받았습니다.  어떤 모드가 모든 사운드 슬롯을 차지하고 있습니다.  만약 Immersive Railroading 모드를 사용 중이라면, 해당 모드 설정에서  ‘override sound channels’를 false로 설정하세요.  GregTech를 사용 중이라면, 그 모드 설정에서 ‘maxNumSounds’ 값을 더 낮게 조정하세요.  Receiver Gun Mod를 사용 중이라면, 이 모드와의 호환성 문제로 인해 설정이 없으므로  모드를 삭제하는 방법밖에 없습니다.  또한 Dynamic Surroundings와 Optifine도 문제를 일으킬 수 있습니다.  위의 해결책을 적용하거나, 해당 모드 제작자에게 문제를 신고하세요.",
     "sytstem.soundsystem": "IMMERSIVE VEHICLES 에러: 오디오 시스템의 오류로 인해 소리가 출력되지 않았습니다.  오디오 드라이브에 문제가 생긴 것은 아닐까요?",
     "sytstem.debug": "%s"
-  }
+
 }

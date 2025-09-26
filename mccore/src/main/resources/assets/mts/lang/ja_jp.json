@@ -1,5 +1,46 @@
 {
-  "entries": {
+    "_comment": "Translated by RagexPrince683",
+    "mts.configuration.Audio": "オーディオ設定",
+    "mts.configuration.Controls": "コントロール設定",
+    "mts.configuration.General": "一般設定",
+    "mts.configuration.HUD": "HUD設定",
+    "mts.configuration.Physics": "車両物理設定",
+    "mts.configuration.Rendering": "レンダリング設定",
+
+
+    "config.audio.error_code": "FMOD エラーコード",
+    "config.audio.fmod_enabled": "FMOD オーディオを有効化",
+    "config.audio.fmod_status": "FMOD ステータス",
+    "config.audio.header": "オーディオ設定",
+    "config.audio.system": "アクティブなオーディオシステム",
+    "config.controls.auto_start_engines": "エンジンを自動始動",
+    "config.controls.auto_turn_signals": "自動ターンシグナル",
+    "config.controls.header": "操作設定",
+    "config.controls.joystick_enabled": "ジョイスティック対応を有効化",
+    "config.controls.mouse_yoke": "マウスを操縦桿として使用",
+    "config.controls.radio_volume": "ラジオ音量",
+    "config.controls.simple_throttle": "簡易スロットルモード",
+    "config.controls.sound_volume": "サウンド音量",
+    "config.general.damage_system": "ダメージシステムを有効化",
+    "config.general.dev_mode": "開発者モード",
+    "config.general.fuel_system": "燃料システムを有効化",
+    "config.general.header": "全般設定",
+    "config.hud.full_hud_1p": "一人称視点でフル HUD",
+    "config.hud.full_hud_3p": "三人称視点でフル HUD",
+    "config.hud.header": "HUD 設定",
+    "config.hud.render_hud_1p": "一人称視点で HUD を表示",
+    "config.hud.render_hud_3p": "三人称視点で HUD を表示",
+    "config.physics.aircraft_speed_factor": "航空機速度係数",
+    "config.physics.car_speed_factor": "車両速度係数",
+    "config.physics.gravity_factor": "重力係数",
+    "config.physics.header": "ビークル物理設定",
+    "config.rendering.fancy_lights": "高度なライティング効果",
+    "config.rendering.header": "レンダリング設定",
+    "config.rendering.render_distance": "ビークル描画距離",
+    "config.rendering.transparent_windows": "透明なウィンドウ",
+
+
+    
     "mts.invisible_seat.subDescription": "",
     "mts.invisible_seat.description": "",
     "mts.invisible_seat.name": "見えないシート (使用しないでください)",
@@ -450,5 +491,8 @@
     "sytstem.soundslot": "IMMERSIVE VEHICLES ERROR: サウンドを再生しようとしましたが、サウンドスロットが利用できないと言われました。一部の mod がすべてのスロットを占有しています。Immersive Railroadingを使用している場合は、その mod の設定でサウンド チャンネルのオーバーライドを false に設定してください。GregTech を実行している場合は、その mod の設定で maxNumSounds を低い値に設定してください。Receiver Gun Mod を使用している場合は、アンインストールしてください (この非互換性に関する設定はありません)。Dynamic Surrondings と Optifine も問題の原因となる可能性があります。修正を適用するか、それらの mod の作成者に苦情を申し立ててください。",
     "sytstem.soundsystem": "IMMERSIVE VEHICLES ERROR: サウンドを再生しようとしましたが、オーディオ システムの障害のため再生できませんでした。オーディオ ドライバーに問題がありますか?",
     "sytstem.debug": "%s"
-  }
+
+
+
+
 }

@@ -53,6 +53,7 @@ import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.event.lifecycle.FMLConstructModEvent;
 import net.neoforged.fml.event.lifecycle.FMLLoadCompleteEvent;
 import net.neoforged.bus.api.IEventBus;
+import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.ModLoadingContext;
 import net.neoforged.fml.loading.FMLEnvironment;
 import net.neoforged.fml.loading.FMLPaths;
@@ -63,6 +64,9 @@ import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 import net.neoforged.neoforge.client.event.RegisterClientReloadListenersEvent;
 import net.neoforged.neoforge.event.AddPackFindersEvent;
 import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.fml.config.ModConfig;
+import net.neoforged.neoforge.client.gui.IConfigScreenFactory;
+import net.neoforged.neoforge.client.gui.ConfigurationScreen;
 
 /**
  * Loader interface for the mod.  This class is not actually an interface, unlike everything else.
@@ -89,10 +93,18 @@ public class InterfaceLoader {
     private static List<BuilderBlock> chargerBlocks = new ArrayList<>();
     protected static final DeferredRegister<CreativeModeTab> CREATIVE_TABS = DeferredRegister.create(Registries.CREATIVE_MODE_TAB, InterfaceLoader.MODID);
 
-    public InterfaceLoader() {
-        this.modEventBus = ModLoadingContext.get().getActiveContainer().getEventBus();
+    public InterfaceLoader(ModContainer container) {
+        this.modEventBus = container.getEventBus();
         this.gameDirectory = FMLPaths.GAMEDIR.get().toFile().getAbsolutePath();
-        
+
+        // Register config for proper NeoForge config GUI using the correct method
+        container.registerConfig(ModConfig.Type.CLIENT, MTSConfig.SPEC);
+
+        // Register config screen factory to make the config button clickable
+        container.registerExtensionPoint(IConfigScreenFactory.class, ConfigurationScreen::new);
+
+        System.out.println("MTS Config registered using container.registerConfig with screen factory");
+
         // Check for DynamicSurroundings very early to prevent FMOD conflicts
         try {
             Class.forName("org.orecruncher.dsurround.DynamicSurroundings");
@@ -102,7 +114,7 @@ public class InterfaceLoader {
         } catch (ClassNotFoundException e) {
             // DynamicSurroundings not present, continue with FMOD
         }
-        
+
         modEventBus.addListener(this::init);
         modEventBus.addListener(this::onPostConstruction);
         modEventBus.addListener(this::onRegisterCapabilities);
@@ -159,6 +171,9 @@ public class InterfaceLoader {
 
         //Init config
         ConfigSystem.loadFromDisk(isClient);
+
+        //Initialize config bridge to sync NeoForge config with MTS settings
+        ConfigBridge.initializeConfigBridge();
 
         //Parse packs.  Look though default game directory and file runtime
         //Some systems don't use the "proper" game directory for mods so we need to look in the file directory too

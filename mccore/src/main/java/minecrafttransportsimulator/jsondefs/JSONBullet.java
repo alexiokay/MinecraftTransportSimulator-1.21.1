@@ -106,6 +106,9 @@ public class JSONBullet extends AJSONMultiModelProvider {
 
         @JSONDescription("The texture of the casing to use for the casing particle, or null if no casing is to be rendered.")
         public String casingTexture;
+
+        @JSONDescription("Name of the FMOD sound event to play when this bullet impacts a target.")
+        public String eventName;
     }
 
     public enum BulletType {

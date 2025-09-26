@@ -1,5 +1,46 @@
 {
-  "entries": {
+    "_comment": "Translated by fsendventd and Deterbold",
+    "mts.configuration.Audio": "Настройки Аудио",
+    "mts.configuration.Controls": "Настройки Управления",
+    "mts.configuration.General": "Общие Настройки",
+    "mts.configuration.HUD": "Настройки HUD",
+    "mts.configuration.Physics": "Настройки Физики Транспорта",
+    "mts.configuration.Rendering": "Настройки Рендеринга",
+
+
+    "config.audio.error_code": "Код ошибки FMOD",
+    "config.audio.fmod_enabled": "Включить аудио FMOD",
+    "config.audio.fmod_status": "Статус FMOD",
+    "config.audio.header": "Настройки звука",
+    "config.audio.system": "Активная аудиосистема",
+    "config.controls.auto_start_engines": "Автозапуск двигателей",
+    "config.controls.auto_turn_signals": "Автоматические поворотники",
+    "config.controls.header": "Настройки управления",
+    "config.controls.joystick_enabled": "Включить поддержку джойстика",
+    "config.controls.mouse_yoke": "Мышь как штурвал самолета",
+    "config.controls.radio_volume": "Громкость радио",
+    "config.controls.simple_throttle": "Простой режим газа",
+    "config.controls.sound_volume": "Громкость звука",
+    "config.general.damage_system": "Включить систему повреждений",
+    "config.general.dev_mode": "Режим разработчика",
+    "config.general.fuel_system": "Включить систему топлива",
+    "config.general.header": "Общие настройки",
+    "config.hud.full_hud_1p": "Полный HUD в первом лице",
+    "config.hud.full_hud_3p": "Полный HUD в третьем лице",
+    "config.hud.header": "Настройки HUD",
+    "config.hud.render_hud_1p": "Показывать HUD в первом лице",
+    "config.hud.render_hud_3p": "Показывать HUD в третьем лице",
+    "config.physics.aircraft_speed_factor": "Коэффициент скорости самолета",
+    "config.physics.car_speed_factor": "Коэффициент скорости автомобиля",
+    "config.physics.gravity_factor": "Коэффициент гравитации",
+    "config.physics.header": "Настройки физики транспортных средств",
+    "config.rendering.fancy_lights": "Эффекты продвинутого освещения",
+    "config.rendering.header": "Настройки рендеринга",
+    "config.rendering.render_distance": "Дальность рендеринга транспортных средств",
+    "config.rendering.transparent_windows": "Прозрачные окна",
+
+
+    
     "mts.invisible_seat.subDescription": "",
     "mts.invisible_seat.description": "",
     "mts.invisible_seat.name": "Невидимое сиденье (НЕ ИСПОЛЬЗОВАТЬ!)",
@@ -471,5 +512,5 @@
     "sytstem.soundslot": "ОШИБКА IMMERSIVE VEHICLES: Нет звуковых слотов для воспроизведения! Другой мод занял слоты. Если есть Immersive Railroading, выключи 'override sound channels' в его настройках. Для GregTech уменьши 'maxNumSounds'. Если установлен Receiver Gun Mod, удали его (нет конфига для этой несовместимости). Dynamic Surroundings и Optifine тоже могут мешать. Примени исправления или жалуйся авторам тех модов.",
     "sytstem.soundsystem": "ОШИБКА IMMERSIVE VEHICLES: Не удалось воспроизвести звук из-за сбоя аудиосистемы. Проблема с аудиодрайверами?",
     "sytstem.debug": "%s"
-  }
+
 }

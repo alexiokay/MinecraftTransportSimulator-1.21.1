@@ -27,6 +27,17 @@ public interface IInterfaceSound {
     void FMODPlaySoundEvent(SoundInstance sound);
 
     /**
+     * Smart sound playing method that tries FMOD first, automatically falls back to original MTS sounds.
+     * If eventName is provided, attempts FMOD. FMODPlaySoundEvent() already handles fallback to OpenAL.
+     * If no eventName, uses original MTS sound system.
+     *
+     * @param sound The sound instance to play
+     * @param eventName The FMOD event name (can be null for non-FMOD sounds)
+     * @return true if FMOD was attempted, false if original system was used
+     */
+    boolean playSmartSound(SoundInstance sound, String eventName);
+
+    /**
      * Adds a station to be queued for updates.  This should only be done once upon station construction.
      */
     void addRadioStation(RadioStation station);

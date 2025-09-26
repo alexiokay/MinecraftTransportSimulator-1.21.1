@@ -50,26 +50,29 @@ public class LanguageSystem {
                 if (packItem instanceof AItemSubTyped) {
                     AItemSubTyped<?> subDefItem = (AItemSubTyped<?>) packItem;
                     itemName = subDefItem.subDefinition.name;
-                    subDefItem.languageSubDescription = new LanguageEntry(subDefItem.subDefinition.description != null ? subDefItem.subDefinition.description : "");
-                    packMap.put(itemID + ".subDescription", subDefItem.languageSubDescription);
+                    String subDescKey = itemID + ".subDescription";
+                    subDefItem.languageSubDescription = new LanguageEntry(subDescKey, subDefItem.subDefinition.description != null ? subDefItem.subDefinition.description : "");
+                    packMap.put(subDescKey, subDefItem.languageSubDescription);
 
                     //Description ignores subName, strip it and associate it if it already exists.
                     String masterItemID = itemID.substring(0, itemID.length() - subDefItem.subDefinition.subName.length()) + ".description";
                     LanguageEntry masterDescription = packMap.get(masterItemID);
                     if (masterDescription == null) {
-                        masterDescription = new LanguageEntry(packItem.definition.general.description != null ? packItem.definition.general.description : "");
+                        masterDescription = new LanguageEntry(masterItemID, packItem.definition.general.description != null ? packItem.definition.general.description : "");
                         packMap.put(masterItemID, masterDescription);
                     }
                     packItem.languageDescription = masterDescription;
                 } else {
-                    packItem.languageDescription = new LanguageEntry(packItem.definition.general.description != null ? packItem.definition.general.description : "");
-                    packMap.put(itemID + ".description", packItem.languageDescription);
+                    String descKey = itemID + ".description";
+                    packItem.languageDescription = new LanguageEntry(descKey, packItem.definition.general.description != null ? packItem.definition.general.description : "");
+                    packMap.put(descKey, packItem.languageDescription);
                 }
                 if (itemName == null) {
                     itemName = packItem.definition.general.name != null ? packItem.definition.general.name : packItem.definition.systemName;
                 }
-                packItem.languageName = new LanguageEntry(itemName);
-                packMap.put(itemID + ".name", packItem.languageName);
+                String nameKey = itemID + ".name";
+                packItem.languageName = new LanguageEntry(nameKey, itemName);
+                packMap.put(nameKey, packItem.languageName);
 
                 //If this is a book item, we need to add a section for all the components.
                 if (packItem instanceof ItemItem) {
@@ -127,13 +130,18 @@ public class LanguageSystem {
         for (String packID : PackParser.getAllPackIDs()) {
             Map<String, LanguageEntry> packMap = packLanguageEntries.get(packID);
             for (String language : InterfaceManager.clientInterface.getAllLanguages()) {
-                String filePath = "/assets/" + packID + "/language/" + language + ".json";
+                String filePath = "/assets/" + packID + "/lang/" + language + ".json";
                 InputStream languageStream = InterfaceManager.coreInterface.getPackResource(filePath);
                 if (languageStream != null) {
                     JSONLanguageFile languageFile;
                     try {
                         languageFile = JSONParser.parseStream(languageStream, JSONLanguageFile.class, null, null);
-                        languageFile.entries.forEach((key, value) -> {
+
+                        languageFile.forEach((key, value) -> {
+                            // Skip _comment field
+                            if (key.equals("_comment")) {
+                                return;
+                            }
                             LanguageEntry languageEntry = packMap.get(key);
                             if (languageEntry != null) {
                                 languageEntry.values.put(language, value);
@@ -156,10 +164,9 @@ public class LanguageSystem {
                 for (Entry<String, Map<String, LanguageEntry>> languagePacks : packLanguageEntries.entrySet()) {
                     String packID = languagePacks.getKey();
                     JSONLanguageFile jsonFileToWrite = new JSONLanguageFile();
-                    jsonFileToWrite.entries = new LinkedHashMap<>();
-                    languagePacks.getValue().forEach((key, languageEntry) -> jsonFileToWrite.entries.put(key, languageEntry.getDefaultValue()));
+                    languagePacks.getValue().forEach((key, languageEntry) -> jsonFileToWrite.put(key, languageEntry.getDefaultValue()));
                     if (packID.equals(InterfaceManager.coreModID)) {
-                        coreLanguageEntires.forEach((key, languageEntry) -> jsonFileToWrite.entries.put(key, languageEntry.getDefaultValue()));
+                        coreLanguageEntires.forEach((key, languageEntry) -> jsonFileToWrite.put(key, languageEntry.getDefaultValue()));
                     }
                     dumpToFolder.mkdir();
                     File packFolder = new File(dumpToFolder, packID);
@@ -187,16 +194,21 @@ public class LanguageSystem {
             this.key = null;
         }
 
-        /**Used only for internal language entires.**/
-        private LanguageEntry(String key, String defaultValue) {
+        /**Used for language entries that need to store their key for translation lookup.**/
+        public LanguageEntry(String key, String defaultValue) {
             values.put(DEFAULT_LANGUAGE_KEY, defaultValue);
             this.key = key;
-            coreLanguageEntires.put(key, this);
+            // Check if this is a core language entry (those with dots like "death.bullet.null")
+            // and add to core map if it is
+            if (key.contains(".") && !key.startsWith("mts.")) {
+                coreLanguageEntires.put(key, this);
+            }
         }
 
         public String getCurrentValue() {
             if (onClient) {
-                String value = values.get(InterfaceManager.clientInterface.getLanguageName());
+                String currentLang = InterfaceManager.clientInterface.getLanguageName();
+                String value = values.get(currentLang);
                 return value != null ? value : getDefaultValue();
             } else {
                 return getDefaultValue();
@@ -208,8 +220,8 @@ public class LanguageSystem {
         }
     }
 
-    public static class JSONLanguageFile {
-        public Map<String, String> entries;
+    public static class JSONLanguageFile extends HashMap<String, String> {
+        // This class now directly extends HashMap to match the flat JSON structure
     }
 
     //List of language entries are kept in this file, as it ensures we init them all when this class is loaded.
@@ -561,4 +573,41 @@ public class LanguageSystem {
     public static final LanguageEntry SYSTEM_SOUNDSLOT = new LanguageEntry("sytstem.soundslot", "IMMERSIVE VEHICLES ERROR: Tried to play a sound, but was told no sound slots were available. Some mod is taking up all the slots. If you have Immersive Railroading, set override sound channels to false in that mod's config. If running GregTech, set maxNumSounds to a lower value in that mod's config. If you have Receiver Gun Mod, un-install it (there is no config for this incopatibility).  If you have fixRTM, set expandPlayableSoundSlotCount to false.  Dynamic Surrondings and Optifine also may cause issues. Apply fixes, or complain to those mod's authors.");
     public static final LanguageEntry SYSTEM_SOUNDSYSTEM = new LanguageEntry("sytstem.soundsystem", "IMMERSIVE VEHICLES ERROR: Tried to play a sound but couldn't due to an audio system fault.  Do you have bad audio drivers?");
     public static final LanguageEntry SYSTEM_DEBUG = new LanguageEntry("sytstem.debug", "%s");
+
+    // NeoForge Config Language Entries
+    public static final LanguageEntry CONFIG_AUDIO_HEADER = new LanguageEntry("config.audio.header", "Audio Settings");
+    public static final LanguageEntry CONFIG_AUDIO_FMOD_STATUS = new LanguageEntry("config.audio.fmod_status", "FMOD Status");
+    public static final LanguageEntry CONFIG_AUDIO_FMOD_ENABLED = new LanguageEntry("config.audio.fmod_enabled", "Enable FMOD Audio");
+    public static final LanguageEntry CONFIG_AUDIO_SYSTEM = new LanguageEntry("config.audio.system", "Active Audio System");
+    public static final LanguageEntry CONFIG_AUDIO_ERROR_CODE = new LanguageEntry("config.audio.error_code", "FMOD Error Code");
+
+    public static final LanguageEntry CONFIG_GENERAL_HEADER = new LanguageEntry("config.general.header", "General Settings");
+    public static final LanguageEntry CONFIG_GENERAL_DEV_MODE = new LanguageEntry("config.general.dev_mode", "Developer Mode");
+    public static final LanguageEntry CONFIG_GENERAL_FUEL_SYSTEM = new LanguageEntry("config.general.fuel_system", "Enable Fuel System");
+    public static final LanguageEntry CONFIG_GENERAL_DAMAGE_SYSTEM = new LanguageEntry("config.general.damage_system", "Enable Damage System");
+
+    public static final LanguageEntry CONFIG_RENDERING_HEADER = new LanguageEntry("config.rendering.header", "Rendering Settings");
+    public static final LanguageEntry CONFIG_RENDERING_FANCY_LIGHTS = new LanguageEntry("config.rendering.fancy_lights", "Fancy Lighting Effects");
+    public static final LanguageEntry CONFIG_RENDERING_TRANSPARENT_WINDOWS = new LanguageEntry("config.rendering.transparent_windows", "Transparent Windows");
+    public static final LanguageEntry CONFIG_RENDERING_RENDER_DISTANCE = new LanguageEntry("config.rendering.render_distance", "Vehicle Render Distance");
+
+    public static final LanguageEntry CONFIG_CONTROLS_HEADER = new LanguageEntry("config.controls.header", "Controls Settings");
+    public static final LanguageEntry CONFIG_CONTROLS_MOUSE_YOKE = new LanguageEntry("config.controls.mouse_yoke", "Mouse as Aircraft Yoke");
+    public static final LanguageEntry CONFIG_CONTROLS_JOYSTICK_ENABLED = new LanguageEntry("config.controls.joystick_enabled", "Enable Joystick Support");
+    public static final LanguageEntry CONFIG_CONTROLS_SIMPLE_THROTTLE = new LanguageEntry("config.controls.simple_throttle", "Simple Throttle Mode");
+    public static final LanguageEntry CONFIG_CONTROLS_AUTO_START_ENGINES = new LanguageEntry("config.controls.auto_start_engines", "Auto-Start Engines");
+    public static final LanguageEntry CONFIG_CONTROLS_AUTO_TURN_SIGNALS = new LanguageEntry("config.controls.auto_turn_signals", "Automatic Turn Signals");
+    public static final LanguageEntry CONFIG_CONTROLS_SOUND_VOLUME = new LanguageEntry("config.controls.sound_volume", "Sound Volume");
+    public static final LanguageEntry CONFIG_CONTROLS_RADIO_VOLUME = new LanguageEntry("config.controls.radio_volume", "Radio Volume");
+
+    public static final LanguageEntry CONFIG_PHYSICS_HEADER = new LanguageEntry("config.physics.header", "Vehicle Physics Settings");
+    public static final LanguageEntry CONFIG_PHYSICS_AIRCRAFT_SPEED_FACTOR = new LanguageEntry("config.physics.aircraft_speed_factor", "Aircraft Speed Factor");
+    public static final LanguageEntry CONFIG_PHYSICS_CAR_SPEED_FACTOR = new LanguageEntry("config.physics.car_speed_factor", "Car Speed Factor");
+    public static final LanguageEntry CONFIG_PHYSICS_GRAVITY_FACTOR = new LanguageEntry("config.physics.gravity_factor", "Gravity Factor");
+
+    public static final LanguageEntry CONFIG_HUD_HEADER = new LanguageEntry("config.hud.header", "HUD Settings");
+    public static final LanguageEntry CONFIG_HUD_RENDER_HUD_1P = new LanguageEntry("config.hud.render_hud_1p", "Show HUD in First-Person");
+    public static final LanguageEntry CONFIG_HUD_RENDER_HUD_3P = new LanguageEntry("config.hud.render_hud_3p", "Show HUD in Third-Person");
+    public static final LanguageEntry CONFIG_HUD_FULL_HUD_1P = new LanguageEntry("config.hud.full_hud_1p", "Full-Size HUD in First-Person");
+    public static final LanguageEntry CONFIG_HUD_FULL_HUD_3P = new LanguageEntry("config.hud.full_hud_3p", "Full-Size HUD in Third-Person");
 }

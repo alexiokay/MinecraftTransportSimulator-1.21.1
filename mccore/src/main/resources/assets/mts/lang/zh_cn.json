@@ -1,5 +1,45 @@
 {
-  "entries": {
+    "_comment": "Translated by 1640800338",
+    "mts.configuration.Audio": "音频设置",
+    "mts.configuration.Controls": "控制设置",
+    "mts.configuration.General": "常规设置",
+    "mts.configuration.HUD": "HUD设置",
+    "mts.configuration.Physics": "载具物理设置",
+    "mts.configuration.Rendering": "渲染设置",
+
+    
+    "config.audio.error_code": "FMOD 错误代码",
+    "config.audio.fmod_enabled": "启用 FMOD 音频",
+    "config.audio.fmod_status": "FMOD 状态",
+    "config.audio.header": "音频设置",
+    "config.audio.system": "当前音频系统",
+    "config.controls.auto_start_engines": "自动启动引擎",
+    "config.controls.auto_turn_signals": "自动转向灯",
+    "config.controls.header": "控制设置",
+    "config.controls.joystick_enabled": "启用操纵杆支持",
+    "config.controls.mouse_yoke": "鼠标作为飞机操纵杆",
+    "config.controls.radio_volume": "无线电音量",
+    "config.controls.simple_throttle": "简易油门模式",
+    "config.controls.sound_volume": "声音音量",
+    "config.general.damage_system": "启用损伤系统",
+    "config.general.dev_mode": "开发者模式",
+    "config.general.fuel_system": "启用燃料系统",
+    "config.general.header": "通用设置",
+    "config.hud.full_hud_1p": "第一人称全屏 HUD",
+    "config.hud.full_hud_3p": "第三人称全屏 HUD",
+    "config.hud.header": "HUD 设置",
+    "config.hud.render_hud_1p": "第一人称显示 HUD",
+    "config.hud.render_hud_3p": "第三人称显示 HUD",
+    "config.physics.aircraft_speed_factor": "飞机速度系数",
+    "config.physics.car_speed_factor": "车辆速度系数",
+    "config.physics.gravity_factor": "重力系数",
+    "config.physics.header": "载具物理设置",
+    "config.rendering.fancy_lights": "高级光照效果",
+    "config.rendering.header": "渲染设置",
+    "config.rendering.render_distance": "车辆渲染距离",
+    "config.rendering.transparent_windows": "透明车窗",
+
+
     "mts.invisible_seat.subDescription": "",
     "mts.invisible_seat.description": "",
     "mts.invisible_seat.name": "隐形座椅（请勿使用！）",
@@ -441,5 +481,5 @@
     "input.turnsignal_l": "左转向灯",
     "sytstem.soundslot": "沉浸车辆错误：声音播放失败，没有可用的声音槽。另一个模组似乎占用了所有槽！如果安装了沉浸式铁路，请将该模组的配置中的“override sound channels”设置为“false”。如果安装了 GregTech，请将“maxNumSounds”设置为较低的值。Dynamic Surroundings 和 Optifine 也可能是原因。如果建议的方法无效，请联系我们。声音将不再播放。",
     "sytstem.debug": "%s"
-  }
+
 }

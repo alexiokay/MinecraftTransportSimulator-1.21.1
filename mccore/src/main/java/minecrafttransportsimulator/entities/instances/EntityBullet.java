@@ -28,6 +28,8 @@ import minecrafttransportsimulator.packets.instances.PacketEntityBulletHitExtern
 import minecrafttransportsimulator.packets.instances.PacketEntityBulletHitGeneric;
 import minecrafttransportsimulator.packets.instances.PacketPlayerChatMessage;
 import minecrafttransportsimulator.systems.ConfigSystem;
+import minecrafttransportsimulator.jsondefs.JSONSound;
+import minecrafttransportsimulator.sound.SoundInstance;
 import minecrafttransportsimulator.systems.LanguageSystem;
 
 /**
@@ -656,7 +658,17 @@ public class EntityBullet extends AEntityD_Definable<JSONBullet> {
             //This lets systems query the blocks we hit before the server adjusts them the next tick.
             if (bullet.world.isClient()) {
                 bullet.spawnParticles(0);
-                bullet.updateSounds(0);
+
+                //Smart sound system: Use FMOD if eventName provided, otherwise use original MTS sounds
+                if (bullet.definition.bullet.eventName != null && !bullet.definition.bullet.eventName.isEmpty()) {
+                    // Create FMOD sound instance and call directly - more efficient
+                    JSONSound tempSoundDef = new JSONSound();
+                    tempSoundDef.eventName = bullet.definition.bullet.eventName;
+                    InterfaceManager.soundInterface.FMODPlaySoundEvent(new SoundInstance(bullet, tempSoundDef));
+                } else {
+                    // Use original MTS sound system
+                    bullet.updateSounds(0);
+                }
             }
         }
         if (gun.currentBullet != null && gun.currentBullet.bulletNumber <= bulletNumber) {

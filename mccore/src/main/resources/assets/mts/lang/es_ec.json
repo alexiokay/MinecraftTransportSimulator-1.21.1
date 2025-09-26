@@ -1,5 +1,45 @@
 {
-  "entries": {
+    "_comment": "Translated by CazadorV",
+    "mts.configuration.Audio": "Configuración de Audio",
+    "mts.configuration.Controls": "Configuración de Controles",
+    "mts.configuration.General": "Configuración General",
+    "mts.configuration.HUD": "Configuración de HUD",
+    "mts.configuration.Physics": "Configuración de Física del Vehículo",
+    "mts.configuration.Rendering": "Configuración de Renderizado",
+
+    "config.audio.error_code": "Código de error FMOD",
+    "config.audio.fmod_enabled": "Habilitar audio FMOD",
+    "config.audio.fmod_status": "Estado de FMOD",
+    "config.audio.header": "Configuración de audio",
+    "config.audio.system": "Sistema de audio activo",
+    "config.controls.auto_start_engines": "Arranque automático de motores",
+    "config.controls.auto_turn_signals": "Direccionales automáticas",
+    "config.controls.header": "Configuración de controles",
+    "config.controls.joystick_enabled": "Habilitar soporte para Joystick",
+    "config.controls.mouse_yoke": "Mouse como mando del avión",
+    "config.controls.radio_volume": "Volumen de la radio",
+    "config.controls.simple_throttle": "Modo de acelerador simple",
+    "config.controls.sound_volume": "Volumen del sonido",
+    "config.general.damage_system": "Habilitar sistema de daños",
+    "config.general.dev_mode": "Modo desarrollador",
+    "config.general.fuel_system": "Habilitar sistema de combustible",
+    "config.general.header": "Configuración general",
+    "config.hud.full_hud_1p": "HUD completo en primera persona",
+    "config.hud.full_hud_3p": "HUD completo en tercera persona",
+    "config.hud.header": "Configuración de HUD",
+    "config.hud.render_hud_1p": "Mostrar HUD en primera persona",
+    "config.hud.render_hud_3p": "Mostrar HUD en tercera persona",
+    "config.physics.aircraft_speed_factor": "Factor de velocidad de aeronaves",
+    "config.physics.car_speed_factor": "Factor de velocidad de carros",
+    "config.physics.gravity_factor": "Factor de gravedad",
+    "config.physics.header": "Configuración de físicas de vehículos",
+    "config.rendering.fancy_lights": "Efectos de iluminación avanzada",
+    "config.rendering.header": "Configuración de renderizado",
+    "config.rendering.render_distance": "Distancia de renderizado de vehículos",
+    "config.rendering.transparent_windows": "Ventanas transparentes",
+
+
+
     "mts.invisible_seat.subDescription": "",
     "mts.invisible_seat.description": "",
     "mts.invisible_seat.name": "Asiento Invisible (¡NO USAR!)",
@@ -471,5 +511,4 @@
     "sytstem.soundslot": "ERROR DE VEHÍCULOS INMERSIVOS: Intentó reproducir un sonido, pero no había ranuras de sonido disponibles. Algún mod está ocupando todas las ranuras. Si tienes Immersive Railroading, establece override sound channels a false en la configuración de ese mod. Si usas GregTech, establece maxNumSounds a un valor más bajo en la configuración de ese mod. Si tienes Receiver Gun Mod, desinstálalo (no hay configuración para esta incompatibilidad). Dynamic Surrondings y Optifine también pueden causar problemas. Aplica las correcciones, o quejate a los autores de esos mods.",
     "sytstem.soundsystem": "ERROR DE VEHÍCULOS INMERSIVOS: Intentó reproducir un sonido pero no pudo debido a un fallo en el sistema de audio. ¿Tienes controladores de audio defectuosos?",
     "sytstem.debug": "%s"
-  }
 }
