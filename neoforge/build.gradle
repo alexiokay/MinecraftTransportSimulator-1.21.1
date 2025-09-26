@@ -71,13 +71,38 @@ neoForge {
 //Automatically copy mccore assets during build
 processResources {
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+
+    // Process neoforge.mods.toml with variable substitution
+    filesMatching("META-INF/neoforge.mods.toml") {
+        expand project.properties
+    }
+
     from(project(":mccore").sourceSets.main.resources.srcDirs) {
         include "assets/mts/textures/**"
         include "assets/mts/lang/**"
         // Explicitly exclude FMOD sound banks from being copied
-  
+
     }
 }
+
+// Process Java source files to substitute version placeholders
+sourceSets.main.java.srcDirs.forEach { srcDir ->
+    tasks.register("processJavaTemplates${srcDir.name.capitalize()}") {
+        doLast {
+            fileTree(srcDir).matching {
+                include "**/*.java"
+            }.forEach { file ->
+                def content = file.text
+                content = content.replaceAll('MODVER = "\\$\\{mod_version\\}"', "MODVER = \"${mod_version}\"")
+                content = content.replaceAll('registrar\\("\\$\\{mod_version\\}"\\)', "registrar(\"${mod_version}\")")
+                content = content.replaceAll('version: \\$\\{mod_version\\}', "version: ${mod_version}")
+                file.text = content
+            }
+        }
+    }
+}
+
+compileJava.dependsOn tasks.matching { it.name.startsWith('processJavaTemplates') }
 
 //Specify dependencies.
 dependencies {

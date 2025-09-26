@@ -80,7 +80,7 @@ import net.neoforged.neoforge.client.gui.ConfigurationScreen;
 public class InterfaceLoader {
     public static final String MODID = "mts";
     public static final String MODNAME = "Immersive Vehicles (MTS)";
-    public static final String MODVER = "22.18.0";
+    public static final String MODVER = "23.0.0";
 
     private final IEventBus modEventBus;
     public static final Logger LOGGER = LogManager.getLogger(InterfaceLoader.MODID);
@@ -403,9 +403,9 @@ public class InterfaceLoader {
         // Initialize the networking interface with the payload registrar
         // Use proper mod version instead of "1" to avoid conflicts
         // Log event details to understand why it's called multiple times
-        InterfaceManager.coreInterface.logError("PAYLOAD EVENT: RegisterPayloadHandlersEvent triggered for version: 22.18.0");
+        InterfaceManager.coreInterface.logError("PAYLOAD EVENT: RegisterPayloadHandlersEvent triggered for version: 23.0.0");
         InterfaceManager.coreInterface.logError("PAYLOAD EVENT: Event source: " + event.getClass().getSimpleName());
-        InterfacePacket.init(event.registrar("22.18.0"));
+        InterfacePacket.init(event.registrar("23.0.0"));
     }
 
     /**
