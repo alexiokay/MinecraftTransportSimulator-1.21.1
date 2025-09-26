@@ -74,6 +74,8 @@ processResources {
     from(project(":mccore").sourceSets.main.resources.srcDirs) {
         include "assets/mts/textures/**"
         include "assets/mts/lang/**"
+        // Explicitly exclude FMOD sound banks from being copied
+  
     }
 }
 
@@ -131,4 +133,6 @@ jar {
     // Global exclusions
     exclude '**/module-info.class'
     exclude 'META-INF/versions/*/module-info.class'
+
+    // Exclude FMOD sound files from the JAR
 }
