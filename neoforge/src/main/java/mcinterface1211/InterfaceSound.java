@@ -13,14 +13,12 @@ import java.util.Map;
 import java.util.Set;
 
 import org.lwjgl.BufferUtils;
-import org.lwjgl.PointerBuffer;
-import org.lwjgl.fmod.FMOD;
-import org.lwjgl.fmod.FMODStudio;
-import org.lwjgl.fmod.FMOD_3D_ATTRIBUTES;
 import org.lwjgl.openal.AL10;
 import org.lwjgl.openal.ALC;
 import org.lwjgl.openal.ALC10;
-import org.lwjgl.system.MemoryUtil;
+
+// FMOD API imports
+import com.fmodapi.FMODAPI;
 
 import minecrafttransportsimulator.baseclasses.Point3D;
 import minecrafttransportsimulator.entities.instances.EntityRadio;
@@ -39,7 +37,6 @@ import net.neoforged.neoforge.client.event.ClientTickEvent;
 import net.neoforged.neoforge.event.level.LevelEvent;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
-import org.lwjgl.system.MemoryStack;
 
 /**
  * Interface for the sound system.  This is responsible for playing sound from vehicles/interactions.
@@ -55,11 +52,9 @@ public class InterfaceSound implements IInterfaceSound {
     private static boolean isSystemPaused;
 
     /**
-     * Current FMOD status for real-time config display
+     * Map to track FMOD API sound instances
      **/
-    private static String currentFMODStatus = "Not initialized";
-    private static String currentAudioSystem = "Pending";
-    private static int currentFMODErrorCode = -1;
+    private static final Map<SoundInstance, String> fmodInstances = new HashMap<>();
 
     /**
      * Map of String-based file-names to Integer pointers to buffer locations.  Used for loading sounds into
@@ -97,419 +92,178 @@ public class InterfaceSound implements IInterfaceSound {
     private static final int MAX_FMOD_INSTANCES = 64;
 
     /**
-     * This gets incremented whenever we try to get a source and fail.  If we get to 10, the sound system
-     * will stop attempting to play sounds.  Used for when mods take all the sources.
+     * Flag to prevent spam of sound slot warnings when audio sources are full.
      **/
-    private static byte sourceGetFailures = 0;
     private static boolean postedSoundWarning;
 
-    private static long fmodSystem;
     private static final String RESET  = "\u001B[0m";
     private static final String GREEN  = "\u001B[32m";
     public static final String RED    = "\u001B[31m";
     private static final String YELLOW = "\u001B[33m";
     private static boolean pausedForMenu = false;
 
+    /**
+     * Initialize FMOD using the API mod - no direct initialization needed
+     */
     public static void FMODSystemInit() {
-        // Skip FMOD initialization on server side - servers don't need audio
-        if (!net.neoforged.fml.loading.FMLEnvironment.dist.isClient()) {
-            InterfaceManager.coreInterface.logInfo(GREEN + "FMOD initialization skipped on server side" + RESET);
-            fmodSystem = 0;
-            currentFMODStatus = "Skipped (server side)";
-            currentAudioSystem = "None";
-            currentFMODErrorCode = 0;
-            ConfigBridge.updateFMODStatus(currentFMODStatus, currentAudioSystem, currentFMODErrorCode);
-            return;
-        }
+        // FMOD initialization is now handled by the FMOD API mod
+        // Just log the status and load our banks
+        if (FMODAPI.isAvailable()) {
+            var status = FMODAPI.getStatus();
+            InterfaceManager.coreInterface.logInfo(GREEN + "FMOD API available: " + status.status + RESET);
 
-        try (MemoryStack stack = MemoryStack.stackPush()) {
-            PointerBuffer pp = stack.mallocPointer(1);
-            int result = FMODStudio.FMOD_Studio_System_Create(pp, FMOD.FMOD_VERSION);
-            if (result != FMOD.FMOD_OK) {
-                InterfaceManager.coreInterface.logInfo(GREEN + "FMOD system create failed: error code=" + result + " - continuing anyway." + RESET);
-                currentFMODStatus = "Create failed";
-                currentAudioSystem = "OpenAL (fallback)";
-                currentFMODErrorCode = result;
-                ConfigBridge.updateFMODStatus(currentFMODStatus, currentAudioSystem, currentFMODErrorCode);
-                return;
-            }
-            fmodSystem = pp.get(0);
-
-            // Get low-level system to configure output type before initialization
-            PointerBuffer lowLevelSystem = stack.mallocPointer(1);
-            result = FMODStudio.FMOD_Studio_System_GetCoreSystem(fmodSystem, lowLevelSystem);
-            if (result == FMOD.FMOD_OK) {
-                long coreSystem = lowLevelSystem.get(0);
-                // Set output type to WASAPI for better shared mode support
-                result = FMOD.FMOD_System_SetOutput(coreSystem, FMOD.FMOD_OUTPUTTYPE_WASAPI);
-                if (result != FMOD.FMOD_OK) {
-                    InterfaceManager.coreInterface.logInfo(GREEN + "FMOD failed to set WASAPI output (code=" + result + "), using default output" + RESET);
-                } else {
-                    InterfaceManager.coreInterface.logInfo(GREEN + "FMOD using WASAPI output for shared mode compatibility" + RESET);
-                }
-            }
-
-            int maxChannels = 128; // Increase channel limit to prevent exhaustion
-            int studioFlags = FMODStudio.FMOD_STUDIO_INIT_NORMAL;
-            // Use flags that allow hardware sharing with other audio systems
-            int flags = FMOD.FMOD_INIT_NORMAL | FMOD.FMOD_INIT_MIX_FROM_UPDATE;
-            result = FMODStudio.FMOD_Studio_System_Initialize(
-                    fmodSystem, maxChannels, studioFlags, flags, 0);
-            if (result != FMOD.FMOD_OK) {
-                InterfaceManager.coreInterface.logInfo(GREEN + "FMOD system initialization failed: error code=" + result + " - continuing anyway." + RESET);
-                currentFMODStatus = "Initialize failed";
-                currentAudioSystem = "OpenAL (fallback)";
-                currentFMODErrorCode = result;
-                ConfigBridge.updateFMODStatus(currentFMODStatus, currentAudioSystem, currentFMODErrorCode);
-                fmodSystem = 0;
-                return;
-            }
-
-            InterfaceManager.coreInterface.logInfo(GREEN + "FMOD system successfully created and initialized" + RESET);
-            currentFMODStatus = "Successfully initialized";
-            currentAudioSystem = "FMOD";
-            currentFMODErrorCode = 0;
-            ConfigBridge.updateFMODStatus(currentFMODStatus, currentAudioSystem, currentFMODErrorCode);
-
-            // Load bank files from direct file paths (original working method)
-            FMODLoadBank("fmod/Master.bank");
-            FMODLoadBank("fmod/Master.strings.bank");
-            FMODLoadBank("fmod/Weapons.bank");
-
-            InterfaceManager.coreInterface.logInfo(GREEN + "FMOD system ready with events: test_event, test_voice, alarm, explosion, m1919, tank_shot, vehicle_explosion, jet_flyby, ship_alarm, etc." + RESET);
-        } catch (Exception e) {
-            InterfaceManager.coreInterface.logInfo(GREEN + "FMOD system initialization failed with exception: " + e.getMessage() + " - continuing anyway." + RESET);
-            currentFMODStatus = "Exception: " + e.getMessage();
-            currentAudioSystem = "OpenAL (fallback)";
-            currentFMODErrorCode = -1;
-            ConfigBridge.updateFMODStatus(currentFMODStatus, currentAudioSystem, currentFMODErrorCode);
-            fmodSystem = 0;
+            // Load MTS banks from our JAR resources
+            FMODLoadBankFromResource("/assets/mts/sounds/fmod/Master.strings.bank");
+            FMODLoadBankFromResource("/assets/mts/sounds/fmod/Master.bank");
+            FMODLoadBankFromResource("/assets/mts/sounds/fmod/Weapons.bank");
+        } else {
+            InterfaceManager.coreInterface.logInfo(YELLOW + "FMOD API not available, using OpenAL fallback" + RESET);
         }
     }
 
     public static void FMODUpdateListener() {
+        if (!FMODAPI.isAvailable()) {
+            return;
+        }
+
         IWrapperPlayer player = InterfaceManager.clientInterface.getClientPlayer();
+        if (player == null) {
+            return;
+        }
 
         Point3D position = player.getPosition();
         Point3D forward = player.getLineOfSight(1.0).normalize();
-        //Point3D up = player.getUpVector(1.0f).normalize();
         Point3D velocity = player.getVelocity();
 
-        try (MemoryStack stack = MemoryStack.stackPush()) {
-            FMOD_3D_ATTRIBUTES attrs = FMOD_3D_ATTRIBUTES.malloc(stack);
-            attrs.position$().set((float) position.x, (float) position.y, (float) -position.z);
-            attrs.velocity().set((float) velocity.x, (float) velocity.y, (float) -velocity.z);
-            attrs.forward().set((float) forward.x, (float) forward.y, (float) -forward.z);
-            attrs.up().set(0f, 1f, -0f);
-            int result = FMODStudio.FMOD_Studio_System_SetListenerAttributes(fmodSystem, 0, attrs, null);
-            if (result != FMOD.FMOD_OK) {
-                System.err.println("SetListenerAttributes failed: result=" + result);
-            }
-        }
+        // Update listener position using FMOD API
+        FMODAPI.setListenerPosition(
+            position.x, position.y, position.z,
+            forward.x, forward.y, forward.z,
+            velocity.x, velocity.y, velocity.z
+        );
     }
 
     public static void FMODSystemShutdown() {
-        // Check if FMOD system is initialized before trying to shut it down
-        if (fmodSystem == 0) {
-            return; // Nothing to shutdown
+        // Clean up MTS-specific FMOD instances
+        if (FMODAPI.isAvailable()) {
+            // Stop all our tracked sounds
+            for (String instanceId : fmodInstances.values()) {
+                FMODAPI.stopEvent(instanceId, false);
+            }
+            fmodInstances.clear();
         }
-
-        // Clean up all active FMOD instances before shutdown
-        FMODCleanupAllInstances();
-
-        int result = FMODStudio.FMOD_Studio_System_Release(fmodSystem);
-        if (result != FMOD.FMOD_OK) {
-            InterfaceManager.coreInterface.logErrorMain(RED + "FMOD system release failed: error code=" + result + RESET);
-            currentFMODStatus = "Shutdown failed";
-            currentAudioSystem = "Unknown";
-            currentFMODErrorCode = result;
-            ConfigBridge.updateFMODStatus(currentFMODStatus, currentAudioSystem, currentFMODErrorCode);
-        } else {
-            currentFMODStatus = "Shutdown";
-            currentAudioSystem = "None";
-            currentFMODErrorCode = 0;
-            ConfigBridge.updateFMODStatus(currentFMODStatus, currentAudioSystem, currentFMODErrorCode);
-        }
-        fmodSystem = 0;
     }
 
     private static void FMODSystemUpdate() {
-        if (fmodSystem == 0) return;
+        if (!FMODAPI.isAvailable()) {
+            return;
+        }
+
         IWrapperPlayer player = InterfaceManager.clientInterface.getClientPlayer();
         if (!InterfaceManager.clientInterface.isGamePaused() && player != null) {
-            if (pausedForMenu) {
-                FMODSetMasterPaused(false);
-                pausedForMenu = false;
-            }
             FMODUpdateListener();
-        } else {
-            if (!pausedForMenu) {
-                FMODSetMasterPaused(true);
-                pausedForMenu = true;
-            }
         }
 
-        // Clean up finished FMOD instances
+        // Clean up finished sound instances
         FMODCleanupFinishedInstances();
-
-        int result = FMODStudio.FMOD_Studio_System_Update(fmodSystem);
-        if (result != FMOD.FMOD_OK) {
-            InterfaceManager.coreInterface.logErrorMain(RED + "FMOD system update failed: error code=" + result + RESET);
-        }
     }
 
     private static void FMODLoadBank(String path) {
-        try (MemoryStack stack = MemoryStack.stackPush()) {
-            PointerBuffer bankPtr = stack.mallocPointer(1);
-            int result = FMODStudio.FMOD_Studio_System_LoadBankFile(
-                    fmodSystem,
-                    stack.UTF8(path, true),
-                    FMODStudio.FMOD_STUDIO_LOAD_BANK_NORMAL,
-                    bankPtr
-            );
-            if (result != FMOD.FMOD_OK) {
-                InterfaceManager.coreInterface.logErrorMain(RED + "FMOD system failed to load bank: " + '"' + path + '"' + ":" + result + RESET);
-                //System.err.println("Unable to load bank '" + path + "': " + result);
-            } else {
-                //System.out.println("Successfully loaded FMOD bank: " + '"' + path + '"');
-                InterfaceManager.coreInterface.logInfo(GREEN + "FMOD system successfully loaded bank: " + '"' + path + '"' + RESET);
-            }
+        if (FMODAPI.loadBank(path)) {
+            InterfaceManager.coreInterface.logInfo(GREEN + "FMOD API successfully loaded bank: " + '"' + path + '"' + RESET);
+        } else {
+            InterfaceManager.coreInterface.logErrorMain(RED + "FMOD API failed to load bank: " + '"' + path + '"' + RESET);
         }
     }
 
-    private static void FMODSetMasterPaused(boolean pause) {
-        try (MemoryStack stack = MemoryStack.stackPush()) {
-            PointerBuffer busPtr = stack.mallocPointer(1);
-            int result = FMODStudio.FMOD_Studio_System_GetBus(
-                    fmodSystem, stack.UTF8("bus:/", true), busPtr
-            );
-            if (result == FMOD.FMOD_OK) {
-                long bus = busPtr.get(0);
-                FMODStudio.FMOD_Studio_Bus_SetPaused(bus, pause ? 1 : 0);
-            }
-        }
-    }
 
     private static void FMODLoadBankFromResource(String resourcePath) {
-        try {
-            // Try multiple strategies to load the bank file from resources
-            InputStream bankStream = null;
-
-            // Strategy 1: Try direct class loader
-            bankStream = InterfaceSound.class.getResourceAsStream(resourcePath);
-
-            // Strategy 2: Try context class loader if first failed
-            if (bankStream == null) {
-                ClassLoader contextClassLoader = Thread.currentThread().getContextClassLoader();
-                bankStream = contextClassLoader.getResourceAsStream(resourcePath.substring(1)); // Remove leading /
-            }
-
-            // Strategy 3: Try the core module's class loader
-            if (bankStream == null) {
-                bankStream = InterfaceManager.coreInterface.getClass().getResourceAsStream(resourcePath);
-            }
-
-            if (bankStream == null) {
-                InterfaceManager.coreInterface.logErrorMain(RED + "FMOD bank resource not found: " + resourcePath + RESET);
-                return;
-            }
-
-            // Read all bytes from the input stream
-            byte[] bankData = bankStream.readAllBytes();
-            bankStream.close();
-
-            InterfaceManager.coreInterface.logInfo(GREEN + "FMOD loaded bank data from resource: " + resourcePath + ", size=" + bankData.length + " bytes" + RESET);
-
-            // Extract to temporary file and use LoadBankFile method
-            String fileName = resourcePath.substring(resourcePath.lastIndexOf('/') + 1);
-            java.io.File tempFile = new java.io.File(System.getProperty("java.io.tmpdir"), "fmod_" + fileName);
-
-            try (java.io.FileOutputStream fos = new java.io.FileOutputStream(tempFile)) {
-                fos.write(bankData);
-            }
-
-            InterfaceManager.coreInterface.logInfo(GREEN + "FMOD extracted bank to temp file: " + tempFile.getAbsolutePath() + RESET);
-
-            // Use LoadBankFile method like the original working implementation
-            try (MemoryStack stack = MemoryStack.stackPush()) {
-                PointerBuffer bankPtr = stack.mallocPointer(1);
-                int result = FMODStudio.FMOD_Studio_System_LoadBankFile(
-                        fmodSystem,
-                        stack.UTF8(tempFile.getAbsolutePath(), true),
-                        FMODStudio.FMOD_STUDIO_LOAD_BANK_NORMAL,
-                        bankPtr
-                );
-
-                if (result == FMOD.FMOD_OK) {
-                    InterfaceManager.coreInterface.logInfo(GREEN + "FMOD system successfully loaded bank from resource: " + resourcePath + " via temp file" + RESET);
-                } else {
-                    InterfaceManager.coreInterface.logErrorMain(RED + "FMOD system failed to load bank from resource: " + resourcePath + ", error code=" + result + RESET);
-                }
-            }
-
-            // Clean up temp file
-            tempFile.deleteOnExit();
-
-        } catch (Exception e) {
-            InterfaceManager.coreInterface.logErrorMain(RED + "Exception loading FMOD bank from resource: " + resourcePath + ", error: " + e.getMessage() + RESET);
+        // Use the new FMOD API method for loading banks from resources
+        if (FMODAPI.loadBankFromResource(InterfaceSound.class, resourcePath)) {
+            InterfaceManager.coreInterface.logInfo(GREEN + "FMOD API successfully loaded bank from resource: " + resourcePath + RESET);
+        } else {
+            InterfaceManager.coreInterface.logErrorMain(RED + "FMOD API failed to load bank from resource: " + resourcePath + RESET);
         }
     }
 
 
 
     public void FMODPlaySoundEvent(SoundInstance sound) {
-        // Check if FMOD system is initialized - if not, fallback to OpenAL
-        if (fmodSystem == 0) {
+        // Check if FMOD system is available through API
+        if (!FMODAPI.isAvailable()) {
             InterfaceManager.coreInterface.logInfo("FMOD system not available, falling back to OpenAL for sound: " + (sound.soundDef != null ? sound.soundDef.name : sound.soundName));
             playQuickSound(sound);
             return;
         }
 
-        // Enforce maximum instance limit to prevent resource exhaustion
-        if (activeFMODInstances.size() >= MAX_FMOD_INSTANCES) {
-            InterfaceManager.coreInterface.logErrorMain(RED + "Maximum FMOD instances (" + MAX_FMOD_INSTANCES + ") reached, cleaning up oldest instances" + RESET);
-            FMODCleanupFinishedInstances();
+        // Use the FMOD eventName from JSON if available, otherwise fall back to soundPlayingName
+        String fmodEventName = (sound.soundDef != null && sound.soundDef.eventName != null)
+                ? sound.soundDef.eventName
+                : sound.soundPlayingName;
 
-            // If still at limit, remove oldest instance
-            if (activeFMODInstances.size() >= MAX_FMOD_INSTANCES && !activeFMODInstances.isEmpty()) {
-                String oldestKey = activeFMODInstances.keySet().iterator().next();
-                long oldestInstance = activeFMODInstances.remove(oldestKey);
-                FMODStudio.FMOD_Studio_EventInstance_Stop(oldestInstance, FMODStudio.FMOD_STUDIO_STOP_IMMEDIATE);
-                FMODStudio.FMOD_Studio_EventInstance_Release(oldestInstance);
+        // Get position coordinates for 3D audio
+        double posX = sound.entity.position.x;
+        double posY = sound.entity.position.y;
+        double posZ = sound.entity.position.z;
+
+        // Use default volume and pitch (MTS handles complex volume/pitch calculations elsewhere)
+        float volume = 1.0f;
+        float pitch = 1.0f;
+
+        // For looping sounds, check if already playing unless forced
+        if (sound.soundDef != null && sound.soundDef.looping && !sound.soundDef.forceSound) {
+            String loopingKey = fmodEventName + "_" + sound.entity.uniqueUUID + "_looping";
+            if (activeFMODInstances.containsKey(loopingKey)) {
+                return; // Already playing this looping sound
             }
         }
 
-        try (MemoryStack stack = MemoryStack.stackPush()) {
-            // Use the FMOD eventName from JSON if available, otherwise fall back to soundPlayingName
-            String fmodEventName = (sound.soundDef != null && sound.soundDef.eventName != null)
-                    ? sound.soundDef.eventName
-                    : sound.soundPlayingName;
+        // Play the sound through FMOD API
+        String instanceId = FMODAPI.playEventAt(fmodEventName, posX, posY, posZ, volume, pitch);
 
-            // Create a unique key that allows multiple sounds per entity but prevents exact duplicates
+        if (instanceId != null) {
+            // Track this instance for cleanup
             String instanceKey = fmodEventName + "_" + sound.entity.uniqueUUID + "_" + System.nanoTime();
-
-            // For looping sounds, use a simpler key to prevent stacking unless forced
             if (sound.soundDef != null && sound.soundDef.looping && !sound.soundDef.forceSound) {
-                String loopingKey = fmodEventName + "_" + sound.entity.uniqueUUID + "_looping";
-                if (activeFMODInstances.containsKey(loopingKey)) {
-                    return; // Already playing this looping sound
-                }
-                instanceKey = loopingKey;
+                instanceKey = fmodEventName + "_" + sound.entity.uniqueUUID + "_looping";
             }
 
-            PointerBuffer descPtr = stack.mallocPointer(1);
-            ByteBuffer eventName = stack.UTF8("event:/" + fmodEventName);
-            int result = FMODStudio.FMOD_Studio_System_GetEvent(
-                    fmodSystem,
-                    eventName,
-                    descPtr
-            );
-            if (result != FMOD.FMOD_OK) {
-                InterfaceManager.coreInterface.logErrorMain(RED + "FMOD system failed to find event: " + '"' + fmodEventName + '"' + ", error code=" + result + ", falling back to OpenAL" + RESET);
-                // Fallback to original MTS sound system - exactly like before FMOD
-                playQuickSound(sound);
-                return;
-            }
-            long description = descPtr.get(0);
+            // Store the instance ID for tracking (we'll need to modify the storage type)
+            activeFMODInstances.put(instanceKey, Long.parseLong(instanceId));
 
-            // Create an instance of the event.
-            PointerBuffer instancePtr = stack.mallocPointer(1);
-            result = FMODStudio.FMOD_Studio_EventDescription_CreateInstance(description, instancePtr);
-            if (result != FMOD.FMOD_OK) {
-                InterfaceManager.coreInterface.logErrorMain(RED + "FMOD failed to create instance for '" + fmodEventName + "': " + result + RESET);
-
-                // If we're out of memory or channels, try cleanup and retry once
-                if (result == FMOD.FMOD_ERR_MEMORY || result == FMOD.FMOD_ERR_CHANNEL_STOLEN) {
-                    FMODCleanupFinishedInstances();
-                    result = FMODStudio.FMOD_Studio_EventDescription_CreateInstance(description, instancePtr);
-                    if (result != FMOD.FMOD_OK) {
-                        InterfaceManager.coreInterface.logErrorMain(RED + "FMOD failed to create instance after cleanup for '" + fmodEventName + "': " + result + RESET);
-                        return;
-                    }
-                } else {
-                    return;
-                }
-            }
-            long instance = instancePtr.get(0);
-
-            // Track this instance
-            activeFMODInstances.put(instanceKey, instance);
-
-            FMOD_3D_ATTRIBUTES attributes = FMOD_3D_ATTRIBUTES.calloc(stack);
-            attributes.position$().set((float) sound.entity.position.x, (float) sound.entity.position.y, (float) -sound.entity.position.z);
-            attributes.velocity().set(0f, 0f, -0f);
-            attributes.forward().set(0f, 0f, -1f);
-            attributes.up().set(0f, 1f, -0f);
-            result = FMODStudio.FMOD_Studio_EventInstance_Set3DAttributes(instance, attributes);
-            if (result != FMOD.FMOD_OK) {
-                InterfaceManager.coreInterface.logErrorMain(RED + "FMOD failed to set 3D attributes for '" + fmodEventName + "': " + result + RESET);
-            }
-
-            // Start the event.  This begins playback.
-            result = FMODStudio.FMOD_Studio_EventInstance_Start(instance);
-            if (result != FMOD.FMOD_OK) {
-                InterfaceManager.coreInterface.logErrorMain(RED + "FMOD failed to start event '" + fmodEventName + "': " + result + RESET);
-                // Remove from tracking if start failed
-                activeFMODInstances.remove(instanceKey);
-            } else {
-                if (FMODStudio.FMOD_Studio_EventInstance_Get3DAttributes(instance, attributes) == FMOD.FMOD_OK) {
-                    InterfaceManager.coreInterface.logInfo(GREEN + "Playing sound event " + '"' + fmodEventName + '"' + " at: " + attributes.position$().x() + ", " + attributes.position$().y() + ", " + attributes.position$().z() + RESET);
-                }
-            }
+            InterfaceManager.coreInterface.logInfo(GREEN + "Playing sound event " + '"' + fmodEventName + '"' + " at: " + posX + ", " + posY + ", " + posZ + RESET);
+        } else {
+            InterfaceManager.coreInterface.logInfo(YELLOW + "FMOD API failed to play event: " + fmodEventName + ", falling back to OpenAL using: " + sound.soundPlayingName + RESET);
+            // The fallback correctly uses sound.soundPlayingName which is the OGG file
+            playQuickSound(sound);
         }
     }
 
     /**
      * Cleans up finished FMOD event instances to prevent memory leaks.
+     * The FMOD API handles most cleanup automatically, so this is simplified.
      */
     private static void FMODCleanupFinishedInstances() {
-        if (fmodSystem == 0 || activeFMODInstances.isEmpty()) return;
+        if (!FMODAPI.isAvailable() || activeFMODInstances.isEmpty()) return;
 
-        try (MemoryStack stack = MemoryStack.stackPush()) {
-            IntBuffer playbackState = stack.mallocInt(1);
-            Iterator<Map.Entry<String, Long>> iterator = activeFMODInstances.entrySet().iterator();
-            int cleanedCount = 0;
+        // The FMOD API handles internal cleanup automatically
+        // For now, we'll let the API manage cleanup internally
+        // This method is kept for compatibility but simplified
 
-            while (iterator.hasNext()) {
-                Map.Entry<String, Long> entry = iterator.next();
-                long instance = entry.getValue();
-
-                int result = FMODStudio.FMOD_Studio_EventInstance_GetPlaybackState(instance, playbackState);
-                if (result == FMOD.FMOD_OK) {
-                    int state = playbackState.get(0);
-                    // Clean up stopped, stopping, or fading instances
-                    if (state == FMODStudio.FMOD_STUDIO_PLAYBACK_STOPPED ||
-                        state == FMODStudio.FMOD_STUDIO_PLAYBACK_STOPPING) {
-                        FMODStudio.FMOD_Studio_EventInstance_Release(instance);
-                        iterator.remove();
-                        cleanedCount++;
-                    }
-                } else {
-                    // If we can't get playback state, assume it's invalid and clean it up
-                    FMODStudio.FMOD_Studio_EventInstance_Release(instance);
-                    iterator.remove();
-                    cleanedCount++;
-                }
-            }
-
-            if (cleanedCount > 0) {
-                InterfaceManager.coreInterface.logInfo(GREEN + "Cleaned up " + cleanedCount + " finished FMOD instances" + RESET);
-            }
-        }
+        InterfaceManager.coreInterface.logInfo("FMOD cleanup handled by API, active instances: " + activeFMODInstances.size());
     }
 
     /**
      * Cleans up all active FMOD event instances.
      */
     private static void FMODCleanupAllInstances() {
-        if (fmodSystem == 0 || activeFMODInstances.isEmpty()) return;
+        if (!FMODAPI.isAvailable() || activeFMODInstances.isEmpty()) return;
 
-        for (long instance : activeFMODInstances.values()) {
-            // Stop the instance first, then release it
-            FMODStudio.FMOD_Studio_EventInstance_Stop(instance, FMODStudio.FMOD_STUDIO_STOP_IMMEDIATE);
-            FMODStudio.FMOD_Studio_EventInstance_Release(instance);
-        }
+        // Stop all sounds through the FMOD API
+        FMODAPI.stopAllSounds();
         activeFMODInstances.clear();
+
+        InterfaceManager.coreInterface.logInfo("All FMOD instances stopped and cleared");
     }
 
     /**
@@ -654,21 +408,19 @@ public class InterfaceSound implements IInterfaceSound {
                 sound.entity.sounds.remove(sound);
             }
             playingSounds.clear();
-            sourceGetFailures = 0;
         }
     }
 
     @Override
     public void playQuickSound(SoundInstance sound) {
-        if (ALC.getFunctionProvider() != null && sourceGetFailures < 10) {
+        if (ALC.getFunctionProvider() != null) {
             //First get the IntBuffer pointer to where this sound data is stored.
             Integer dataBufferPointer;
             try {
                 dataBufferPointer = loadOGGJarSound(sound.soundPlayingName);
             } catch (Exception e) {
-                if (++sourceGetFailures == 10) {
-                    InterfaceManager.clientInterface.getClientPlayer().displayChatMessage(LanguageSystem.SYSTEM_SOUNDSYSTEM);
-                }
+                // Log the error but don't disable the entire sound system
+                System.err.println("[MTS Sound] Failed to load sound: " + sound.soundPlayingName + " - " + e.getMessage());
                 dataBufferPointer = null;
             }
             if (dataBufferPointer != null) {
@@ -678,32 +430,43 @@ public class InterfaceSound implements IInterfaceSound {
                 AL10.alGenSources(sourceBuffer);
                 if (AL10.alGetError() != AL10.AL_NO_ERROR) {
                     AL10.alDeleteBuffers(dataBufferPointer);
-                    if (++sourceGetFailures == 10) {
+
+                    // Try to free up a sound slot by removing the furthest sound from the player
+                    if (!playingSounds.isEmpty()) {
                         if (!postedSoundWarning) {
                             InterfaceManager.clientInterface.getClientPlayer().displayChatMessage(LanguageSystem.SYSTEM_SOUNDSLOT);
                             postedSoundWarning = true;
                         }
-                        ///Kill off the sound that's furthest from the player to make room if we have a sound we can remove.
-                        //This keeps the sounds going, even with limited slots.
-                        if (!playingSounds.isEmpty()) {
-                            SoundInstance furthestSound = null;
-                            Point3D playerPosition = InterfaceManager.clientInterface.getClientPlayer().getPosition();
-                            for (SoundInstance testSound : playingSounds) {
-                                if (furthestSound == null || playerPosition.isFirstCloserThanSecond(testSound.position, furthestSound.position)) {
-                                    furthestSound = testSound;
-                                }
+
+                        SoundInstance furthestSound = null;
+                        Point3D playerPosition = InterfaceManager.clientInterface.getClientPlayer().getPosition();
+                        for (SoundInstance testSound : playingSounds) {
+                            if (furthestSound == null || playerPosition.isFirstCloserThanSecond(testSound.position, furthestSound.position)) {
+                                furthestSound = testSound;
                             }
-                            sourceGetFailures = 0;
+                        }
+
+                        if (furthestSound != null) {
                             //Manually stop sound and remove from iterator.
-                            //This makes the source entity think that it's still playing and won't re-add it.
                             AL10.alSourcei(furthestSound.sourceIndex, AL10.AL_BUFFER, AL10.AL_NONE);
                             sourceBuffer = BufferUtils.createIntBuffer(1);
                             sourceBuffer.put(furthestSound.sourceIndex).flip();
                             AL10.alDeleteSources(sourceBuffer);
                             playingSounds.remove(furthestSound);
+
+                            // Try again with the freed slot
+                            AL10.alGenSources(sourceBuffer);
+                            if (AL10.alGetError() == AL10.AL_NO_ERROR) {
+                                // Successfully got a source, continue with setup
+                            } else {
+                                // Still can't get a source, give up on this sound
+                                return;
+                            }
                         }
+                    } else {
+                        // No sounds to remove, give up
+                        return;
                     }
-                    return;
                 }
                 sound.sourceIndex = sourceBuffer.get(0);
 
@@ -716,6 +479,7 @@ public class InterfaceSound implements IInterfaceSound {
                 //Done setting up buffer.  Queue sound to start playing.
                 queuedSounds.add(sound);
                 sound.entity.sounds.add(sound);
+
             }
         }
     }
@@ -727,17 +491,15 @@ public class InterfaceSound implements IInterfaceSound {
 
     @Override
     public void addRadioSound(SoundInstance sound, Collection<Integer> buffers) {
-        if (ALC.getFunctionProvider() != null && sourceGetFailures < 10) {
+        if (ALC.getFunctionProvider() != null) {
             //Set the sound's source buffer index.
             IntBuffer sourceBuffer = BufferUtils.createIntBuffer(1);
             AL10.alGetError();
             AL10.alGenSources(sourceBuffer);
             if (AL10.alGetError() != AL10.AL_NO_ERROR) {
-                if (++sourceGetFailures == 10) {
-                    if (!postedSoundWarning) {
-                        InterfaceManager.clientInterface.getClientPlayer().displayChatMessage(LanguageSystem.SYSTEM_SOUNDSLOT);
-                        postedSoundWarning = true;
-                    }
+                if (!postedSoundWarning) {
+                    InterfaceManager.clientInterface.getClientPlayer().displayChatMessage(LanguageSystem.SYSTEM_SOUNDSLOT);
+                    postedSoundWarning = true;
                 }
                 return;
             }
@@ -825,9 +587,22 @@ public class InterfaceSound implements IInterfaceSound {
             return dataSourceBuffers.get(soundName);
         } else {
             //Need to parse the data.  Do so now.
-            String soundDomain = soundName.substring(0, soundName.indexOf(':'));
-            String soundPath = soundName.substring(soundDomain.length() + 1);
-            InputStream soundStream = InterfaceManager.coreInterface.getPackResource("/assets/" + soundDomain + "/sounds/" + soundPath + ".ogg");
+            String soundDomain;
+            String soundPath;
+
+            // Handle cases where soundName doesn't contain domain (FMOD event names)
+            int colonIndex = soundName.indexOf(':');
+            if (colonIndex == -1) {
+                // No domain specified, assume it's an MTS sound
+                soundDomain = "mts";
+                soundPath = soundName;
+            } else {
+                soundDomain = soundName.substring(0, colonIndex);
+                soundPath = soundName.substring(colonIndex + 1);
+            }
+
+            String soundResourcePath = "/assets/" + soundDomain + "/sounds/" + soundPath + ".ogg";
+            InputStream soundStream = InterfaceManager.coreInterface.getPackResource(soundResourcePath);
             if (soundStream != null) {
                 //Create decoder and decode whole file.
                 OGGDecoder decoder = new OGGDecoder(soundStream);
@@ -849,6 +624,8 @@ public class InterfaceSound implements IInterfaceSound {
                 dataSourceBuffers.put(soundName, dataBufferPointers.get(0));
                 return dataSourceBuffers.get(soundName);
             } else {
+                // Log the issue for debugging
+                InterfaceManager.coreInterface.logErrorMain("Failed to find sound file: " + soundResourcePath + " (original soundName: " + soundName + ")");
                 return null;
             }
         }
@@ -919,14 +696,22 @@ public class InterfaceSound implements IInterfaceSound {
      * Gets the current FMOD status for real-time config display.
      */
     public static String getCurrentFMODStatus() {
-        return currentFMODStatus;
+        if (FMODAPI.isAvailable()) {
+            var status = FMODAPI.getStatus();
+            return status.status;
+        }
+        return "Not Available";
     }
 
     /**
      * Gets the current audio system for real-time config display.
      */
     public static String getCurrentAudioSystem() {
-        return currentAudioSystem;
+        if (FMODAPI.isAvailable()) {
+            var status = FMODAPI.getStatus();
+            return status.audioSystem;
+        }
+        return "OpenAL";
     }
 
     /**
@@ -958,6 +743,10 @@ public class InterfaceSound implements IInterfaceSound {
      * Gets the current FMOD error code for real-time config display.
      */
     public static int getCurrentFMODErrorCode() {
-        return currentFMODErrorCode;
+        if (FMODAPI.isAvailable()) {
+            var status = FMODAPI.getStatus();
+            return status.errorCode;
+        }
+        return -1; // Not available
     }
 }

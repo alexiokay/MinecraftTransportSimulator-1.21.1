@@ -9,11 +9,7 @@ import net.neoforged.neoforge.common.ModConfigSpec;
 public class MTSConfig {
     private static final ModConfigSpec.Builder BUILDER = new ModConfigSpec.Builder();
 
-    // Audio Configuration
-    public static final ModConfigSpec.ConfigValue<String> FMOD_STATUS;
-    public static final ModConfigSpec.BooleanValue FMOD_ENABLED;
-    public static final ModConfigSpec.ConfigValue<String> AUDIO_SYSTEM;
-    public static final ModConfigSpec.IntValue FMOD_ERROR_CODE;
+    // Audio configuration moved to FMOD API mod
 
     // General Settings
     public static final ModConfigSpec.BooleanValue DEV_MODE;
@@ -46,25 +42,6 @@ public class MTSConfig {
     public static final ModConfigSpec.BooleanValue FULL_HUD_3P;
 
     static {
-        BUILDER.push("Audio");
-        FMOD_STATUS = BUILDER
-            .comment("Current FMOD initialization status")
-            .translation("config.audio.fmod_status")
-            .define("fmodStatus", "Not initialized");
-        FMOD_ENABLED = BUILDER
-            .comment("Whether FMOD audio system is enabled")
-            .translation("config.audio.fmod_enabled")
-            .define("fmodEnabled", true);
-        AUDIO_SYSTEM = BUILDER
-            .comment("Current active audio system (FMOD/OpenAL)")
-            .translation("config.audio.system")
-            .define("audioSystem", "Pending");
-        FMOD_ERROR_CODE = BUILDER
-            .comment("Last FMOD error code (0 = success, 20 = hardware conflict)")
-            .translation("config.audio.error_code")
-            .defineInRange("fmodErrorCode", -1, -1, 999);
-        BUILDER.pop();
-
         BUILDER.push("General");
         DEV_MODE = BUILDER
             .comment("Enable developer mode features")

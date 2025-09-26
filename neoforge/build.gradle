@@ -130,34 +130,24 @@ dependencies {
 
     // Removed Configured dependency - using native NeoForge config GUI instead
 
-    // FMOD bindings - back to 3.3.3, focus on working in dev mode first
-    compileOnly("org.lwjgl:lwjgl-fmod:3.3.3")
-    // For development environment
-    additionalRuntimeClasspath("org.lwjgl:lwjgl-fmod:3.3.3")
-    // Add to fmodOnly configuration for extraction
-    fmodOnly("org.lwjgl:lwjgl-fmod:3.3.3")
+    // FMOD API dependency - use the API mod instead of direct FMOD
+    implementation files("../../fmod-API/build/libs/fmodapi-1.0.0.jar")
 }
 
 tasks.withType(JavaCompile).configureEach {
     options.encoding = "UTF-8"
 }
 
-// Include FMOD classes directly in the JAR (without LWJGL system classes)
+// JAR configuration - exclude FMOD classes since they come from API mod
 jar {
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
-
-    // Add FMOD classes directly to the JAR
-    from(configurations.fmodOnly.collect { zipTree(it) }) {
-        // Only include FMOD classes, not LWJGL system classes
-        include 'org/lwjgl/fmod/**'
-        // Exclude all module-info files to prevent conflicts
-        exclude '**/module-info.class'
-        exclude 'META-INF/versions/*/module-info.class'
-    }
 
     // Global exclusions
     exclude '**/module-info.class'
     exclude 'META-INF/versions/*/module-info.class'
 
     // Exclude FMOD sound files from the JAR
+    exclude 'assets/mts/sounds/fmod/**'
+
+    // Native libraries handled by FMOD API mod
 }

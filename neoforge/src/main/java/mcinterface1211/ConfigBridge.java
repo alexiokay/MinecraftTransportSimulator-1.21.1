@@ -180,36 +180,5 @@ public class ConfigBridge {
         }
     }
 
-    /**
-     * Updates FMOD status in the NeoForge config.
-     * Called by InterfaceSound when FMOD initialization completes.
-     */
-    public static void updateFMODStatus(String status, String audioSystem, int errorCode) {
-        try {
-            MTSConfig.FMOD_STATUS.set(status);
-            MTSConfig.AUDIO_SYSTEM.set(audioSystem);
-            MTSConfig.FMOD_ERROR_CODE.set(errorCode);
-        } catch (Exception e) {
-            // Config not ready yet - this is expected during early initialization
-            System.out.println("ConfigBridge: Config not ready for FMOD status update, skipping");
-        }
-    }
-
-    /**
-     * Called when any screen is about to open.
-     * Refresh FMOD status if it's a config screen.
-     */
-    @SubscribeEvent
-    public static void onScreenOpening(ScreenEvent.Opening event) {
-        if (event.getNewScreen().getClass().getName().contains("ConfigurationScreen")) {
-            // Just get current status and update config
-            String status = InterfaceSound.getCurrentFMODStatus();
-            String system = InterfaceSound.getCurrentAudioSystem();
-            int errorCode = InterfaceSound.getCurrentFMODErrorCode();
-
-            MTSConfig.FMOD_STATUS.set(status);
-            MTSConfig.AUDIO_SYSTEM.set(system);
-            MTSConfig.FMOD_ERROR_CODE.set(errorCode);
-        }
-    }
+    // FMOD status tracking moved to FMOD API mod
 }

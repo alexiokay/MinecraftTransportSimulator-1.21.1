@@ -1,11 +1,7 @@
 package mcinterface1211;
 
 import java.io.File;
-import java.io.InputStream;
-import java.io.FileOutputStream;
-import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -91,33 +87,25 @@ public class InterfaceLoader {
     private static List<BuilderBlock> chargerBlocks = new ArrayList<>();
     protected static final DeferredRegister<CreativeModeTab> CREATIVE_TABS = DeferredRegister.create(Registries.CREATIVE_MODE_TAB, InterfaceLoader.MODID);
 
-    public InterfaceLoader(ModContainer container) {
-        this.modEventBus = container.getEventBus();
+    public InterfaceLoader(IEventBus modEventBus, ModContainer modContainer) {
+        this.modEventBus = modEventBus;
         this.gameDirectory = FMLPaths.GAMEDIR.get().toFile().getAbsolutePath();
 
         // Register config for proper NeoForge config GUI using the correct method
-        container.registerConfig(ModConfig.Type.CLIENT, MTSConfig.SPEC);
+        modContainer.registerConfig(ModConfig.Type.CLIENT, MTSConfig.SPEC);
 
         // Register config screen factory only on client side
         if (FMLEnvironment.dist.isClient()) {
             try {
                 // Use reflection to avoid direct client-only imports
-                Class.forName("mcinterface1211.ClientConfigRegistration").getMethod("registerConfigScreen", ModContainer.class).invoke(null, container);
+                Class.forName("mcinterface1211.ClientConfigRegistration").getMethod("registerConfigScreen", ModContainer.class).invoke(null, modContainer);
                 System.out.println("MTS Config screen factory registered for client");
             } catch (Exception e) {
                 System.err.println("Failed to register config screen factory: " + e.getMessage());
             }
         }
 
-        // Check for DynamicSurroundings very early to prevent FMOD conflicts
-        try {
-            Class.forName("org.orecruncher.dsurround.DynamicSurroundings");
-            System.out.println("DynamicSurroundings detected in constructor - FMOD libraries will not be loaded to prevent conflicts");
-            // Set a flag to skip FMOD loading
-            System.setProperty("mts.fmod.disabled", "true");
-        } catch (ClassNotFoundException e) {
-            // DynamicSurroundings not present, continue with FMOD
-        }
+        // Native libraries are now handled by FMOD API mod
 
         modEventBus.addListener(this::init);
         modEventBus.addListener(this::onPostConstruction);
@@ -133,21 +121,7 @@ public class InterfaceLoader {
      * 
      */
     public void init(FMLConstructModEvent event) {
-        try {
-            // Check if FMOD was disabled due to DynamicSurroundings detection
-            if ("true".equals(System.getProperty("mts.fmod.disabled"))) {
-                System.out.println("FMOD libraries loading skipped due to DynamicSurroundings detection");
-                return;
-            }
-            
-            // Only extract and load FMOD libraries - Minecraft handles LWJGL
-            loadLibraryFromJar("/libraries/fmod.dll", "fmod");
-            loadLibraryFromJar("/libraries/fmodstudio.dll", "fmodstudio");
-            System.out.println("FMOD native libraries loaded successfully");
-        } catch (Exception e) {
-            System.err.println("Failed to load native libraries: " + e.getMessage());
-            e.printStackTrace();
-        }
+        // Native libraries are now handled by FMOD API mod
         //Add registries.
         BuilderItem.ITEMS.register(modEventBus);
         BuilderBlock.BLOCKS.register(modEventBus);
@@ -485,31 +459,4 @@ public class InterfaceLoader {
         }
     }
 
-    private static void loadLibraryFromJar(String resourcePath, String libraryName) throws Exception {
-        try (InputStream is = InterfaceLoader.class.getResourceAsStream(resourcePath)) {
-            if (is == null) {
-                throw new RuntimeException("Library not found in JAR: " + resourcePath);
-            }
-
-            // Create temp file
-            Path tempDir = Files.createTempDirectory("mts-fmod-libs");
-            tempDir.toFile().deleteOnExit();
-
-            Path tempFile = tempDir.resolve(libraryName + ".dll");
-            tempFile.toFile().deleteOnExit();
-
-            // Extract to temp file
-            try (FileOutputStream fos = new FileOutputStream(tempFile.toFile())) {
-                byte[] buffer = new byte[8192];
-                int bytesRead;
-                while ((bytesRead = is.read(buffer)) != -1) {
-                    fos.write(buffer, 0, bytesRead);
-                }
-            }
-
-            // Load the library
-            System.load(tempFile.toAbsolutePath().toString());
-            System.out.println("Successfully loaded: " + libraryName + ".dll");
-        }
-    }
 }
