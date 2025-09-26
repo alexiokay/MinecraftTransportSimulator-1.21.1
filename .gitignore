@@ -2,6 +2,7 @@
 run
 build
 .gradle
+.claude
 
 # eclipse
 eclipse
