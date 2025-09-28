@@ -130,8 +130,8 @@ dependencies {
 
     // Removed Configured dependency - using native NeoForge config GUI instead
 
-    // FMOD API dependency - use the API mod instead of direct FMOD
-    implementation files("../../fmod-API/build/libs/fmodapi-1.0.0.jar")
+    // FMOD API dependency - OPTIONAL, loaded via reflection at runtime
+    compileOnly files("../../fmod-API/build/libs/fmodapi-1.0.0.jar")
 }
 
 tasks.withType(JavaCompile).configureEach {
@@ -146,8 +146,7 @@ jar {
     exclude '**/module-info.class'
     exclude 'META-INF/versions/*/module-info.class'
 
-    // Exclude FMOD sound files from the JAR
-    exclude 'assets/mts/sounds/fmod/**'
+    // FMOD sound files included for runtime loading
 
     // Native libraries handled by FMOD API mod
 }

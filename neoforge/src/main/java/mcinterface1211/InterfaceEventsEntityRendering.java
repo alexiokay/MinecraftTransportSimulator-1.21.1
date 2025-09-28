@@ -79,6 +79,9 @@ public class InterfaceEventsEntityRendering {
                 //We do this in first-person mode since third-person adds zoom stuff.
                 ((mcinterface1211.mixin.client.CameraMixin) camera).invoke_setPosition(cameraAdjustedPosition.x, cameraAdjustedPosition.y, cameraAdjustedPosition.z);
                 adjustedCamera = true;
+
+                // FMOD listener position now automatically handled by FMOD API mod
+                // updateFMODListener(); // Disabled - automatic tracking in FMOD API
             }
         }
     }
@@ -170,4 +173,5 @@ public class InterfaceEventsEntityRendering {
         // This method has been disabled as we now use proper Screen/Menu pattern
         // Input handling is now done through AbstractContainerScreen
     }
+
 }

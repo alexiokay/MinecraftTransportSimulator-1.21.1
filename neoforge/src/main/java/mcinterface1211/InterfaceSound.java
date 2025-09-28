@@ -17,8 +17,7 @@ import org.lwjgl.openal.AL10;
 import org.lwjgl.openal.ALC;
 import org.lwjgl.openal.ALC10;
 
-// FMOD API imports
-import com.fmodapi.FMODAPI;
+// FMOD API imports - using reflection for optional loading
 
 import minecrafttransportsimulator.baseclasses.Point3D;
 import minecrafttransportsimulator.entities.instances.EntityRadio;
@@ -39,6 +38,91 @@ import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 
 /**
+ * Optional FMOD API wrapper using reflection for safe loading
+ */
+class FMODAPIWrapper {
+    private static Class<?> fmodAPIClass = null;
+    private static boolean checkedAvailability = false;
+
+    static {
+        try {
+            fmodAPIClass = Class.forName("com.fmodapi.FMODAPI");
+            InterfaceManager.coreInterface.logInfo("FMOD API mod detected and loaded successfully");
+        } catch (ClassNotFoundException e) {
+            InterfaceManager.coreInterface.logInfo("FMOD API mod not found - using OpenAL only");
+            fmodAPIClass = null;
+        }
+        checkedAvailability = true;
+    }
+
+    public static boolean isAvailable() {
+        return fmodAPIClass != null;
+    }
+
+    public static boolean registerBank(Class<?> modClass, String resourcePath) {
+        if (!isAvailable()) return false;
+        try {
+            var method = fmodAPIClass.getMethod("registerBank", Class.class, String.class);
+            return (Boolean) method.invoke(null, modClass, resourcePath);
+        } catch (Exception e) {
+            InterfaceManager.coreInterface.logError("FMOD registerBank failed: " + e.getMessage());
+            return false;
+        }
+    }
+
+    public static boolean loadBankFromResource(Class<?> modClass, String resourcePath) {
+        if (!isAvailable()) return false;
+        try {
+            var method = fmodAPIClass.getMethod("loadBankFromResource", Class.class, String.class);
+            return (Boolean) method.invoke(null, modClass, resourcePath);
+        } catch (Exception e) {
+            InterfaceManager.coreInterface.logError("FMOD loadBankFromResource failed: " + e.getMessage());
+            return false;
+        }
+    }
+
+    public static void setListenerPosition(double x, double y, double z, double fx, double fy, double fz, double vx, double vy, double vz) {
+        if (!isAvailable()) return;
+        try {
+            var method = fmodAPIClass.getMethod("setListenerPosition", double.class, double.class, double.class, double.class, double.class, double.class, double.class, double.class, double.class);
+            method.invoke(null, x, y, z, fx, fy, fz, vx, vy, vz);
+        } catch (Exception e) {
+            // Silently ignore listener update failures
+        }
+    }
+
+    public static boolean playEventSimple(String eventName, double x, double y, double z) {
+        if (!isAvailable()) return false;
+        try {
+            var method = fmodAPIClass.getMethod("playEventSimple", String.class, double.class, double.class, double.class);
+            return (Boolean) method.invoke(null, eventName, x, y, z);
+        } catch (Exception e) {
+            return false; // Fallback to OpenAL
+        }
+    }
+
+    public static void stopAllSounds() {
+        if (!isAvailable()) return;
+        try {
+            var method = fmodAPIClass.getMethod("stopAllSounds");
+            method.invoke(null);
+        } catch (Exception e) {
+            // Ignore cleanup errors
+        }
+    }
+
+    public static Object getStatus() {
+        if (!isAvailable()) return null;
+        try {
+            var method = fmodAPIClass.getMethod("getStatus");
+            return method.invoke(null);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+}
+
+/**
  * Interface for the sound system.  This is responsible for playing sound from vehicles/interactions.
  * As well as from the internal radio.
  *
@@ -51,10 +135,7 @@ public class InterfaceSound implements IInterfaceSound {
      **/
     private static boolean isSystemPaused;
 
-    /**
-     * Map to track FMOD API sound instances
-     **/
-    private static final Map<SoundInstance, String> fmodInstances = new HashMap<>();
+    // FMOD instance tracking removed - FMOD API handles this internally
 
     /**
      * Map of String-based file-names to Integer pointers to buffer locations.  Used for loading sounds into
@@ -81,15 +162,7 @@ public class InterfaceSound implements IInterfaceSound {
      **/
     private static final List<SoundInstance> pausedRadioSounds = new ArrayList<>();
 
-    /**
-     * Map of active FMOD event instances to track and manage them properly.
-     **/
-    private static final Map<String, Long> activeFMODInstances = new HashMap<>();
-
-    /**
-     * Maximum number of concurrent FMOD instances to prevent resource exhaustion.
-     **/
-    private static final int MAX_FMOD_INSTANCES = 64;
+    // FMOD instance tracking removed - FMOD API handles this internally
 
     /**
      * Flag to prevent spam of sound slot warnings when audio sources are full.
@@ -100,102 +173,57 @@ public class InterfaceSound implements IInterfaceSound {
     private static final String GREEN  = "\u001B[32m";
     public static final String RED    = "\u001B[31m";
     private static final String YELLOW = "\u001B[33m";
-    private static boolean pausedForMenu = false;
+
+    // pausedForMenu removed - FMOD API handles pause/resume automatically
+
+    // FMOD availability checking removed - FMOD API handles everything internally
 
     /**
      * Initialize FMOD using the API mod - no direct initialization needed
      */
     public static void FMODSystemInit() {
         // FMOD initialization is now handled by the FMOD API mod
-        // Just log the status and load our banks
-        if (FMODAPI.isAvailable()) {
-            var status = FMODAPI.getStatus();
-            InterfaceManager.coreInterface.logInfo(GREEN + "FMOD API available: " + status.status + RESET);
+        // Register our banks with FMOD API for automatic loading/reloading
+        try {
+            InterfaceManager.coreInterface.logInfo("Registering FMOD banks with FMOD API...");
 
-            // Load MTS banks from our JAR resources
-            FMODLoadBankFromResource("/assets/mts/sounds/fmod/Master.strings.bank");
-            FMODLoadBankFromResource("/assets/mts/sounds/fmod/Master.bank");
-            FMODLoadBankFromResource("/assets/mts/sounds/fmod/Weapons.bank");
-        } else {
-            InterfaceManager.coreInterface.logInfo(YELLOW + "FMOD API not available, using OpenAL fallback" + RESET);
+            // Register MTS banks with the FMOD API for automatic loading when FMOD is available
+            FMODAPIWrapper.registerBank(minecrafttransportsimulator.baseclasses.Point3D.class, "/assets/mts/sounds/fmod/Master.strings.bank");
+            FMODAPIWrapper.registerBank(minecrafttransportsimulator.baseclasses.Point3D.class, "/assets/mts/sounds/fmod/Master.bank");
+            FMODAPIWrapper.registerBank(minecrafttransportsimulator.baseclasses.Point3D.class, "/assets/mts/sounds/fmod/Weapons.bank");
+
+            InterfaceManager.coreInterface.logInfo("FMOD bank registration complete.");
+        } catch (Exception e) {
+            InterfaceManager.coreInterface.logError("FMOD bank registration failed: " + e.getMessage());
         }
     }
 
-    public static void FMODUpdateListener() {
-        if (!FMODAPI.isAvailable()) {
-            return;
-        }
-
-        IWrapperPlayer player = InterfaceManager.clientInterface.getClientPlayer();
-        if (player == null) {
-            return;
-        }
-
-        Point3D position = player.getPosition();
-        Point3D forward = player.getLineOfSight(1.0).normalize();
-        Point3D velocity = player.getVelocity();
-
-        // Update listener position using FMOD API
-        FMODAPI.setListenerPosition(
-            position.x, position.y, position.z,
-            forward.x, forward.y, forward.z,
-            velocity.x, velocity.y, velocity.z
-        );
-    }
+    // FMODUpdateListener removed - FMOD API has FMODListenerTracker for automatic player tracking
 
     public static void FMODSystemShutdown() {
-        // Clean up MTS-specific FMOD instances
-        if (FMODAPI.isAvailable()) {
-            // Stop all our tracked sounds
-            for (String instanceId : fmodInstances.values()) {
-                FMODAPI.stopEvent(instanceId, false);
-            }
-            fmodInstances.clear();
-        }
+        // FMOD API handles all cleanup internally - nothing needed here
+        InterfaceManager.coreInterface.logInfo("FMOD shutdown - cleanup handled by FMOD API");
     }
 
-    private static void FMODSystemUpdate() {
-        if (!FMODAPI.isAvailable()) {
-            return;
-        }
-
-        IWrapperPlayer player = InterfaceManager.clientInterface.getClientPlayer();
-        if (!InterfaceManager.clientInterface.isGamePaused() && player != null) {
-            FMODUpdateListener();
-        }
-
-        // Clean up finished sound instances
-        FMODCleanupFinishedInstances();
-    }
-
-    private static void FMODLoadBank(String path) {
-        if (FMODAPI.loadBank(path)) {
-            InterfaceManager.coreInterface.logInfo(GREEN + "FMOD API successfully loaded bank: " + '"' + path + '"' + RESET);
-        } else {
-            InterfaceManager.coreInterface.logErrorMain(RED + "FMOD API failed to load bank: " + '"' + path + '"' + RESET);
-        }
-    }
-
+    // FMODSystemUpdate removed - FMOD API handles all updates internally via FMODMinecraftIntegration
 
     private static void FMODLoadBankFromResource(String resourcePath) {
-        // Use the new FMOD API method for loading banks from resources
-        if (FMODAPI.loadBankFromResource(InterfaceSound.class, resourcePath)) {
-            InterfaceManager.coreInterface.logInfo(GREEN + "FMOD API successfully loaded bank from resource: " + resourcePath + RESET);
-        } else {
-            InterfaceManager.coreInterface.logErrorMain(RED + "FMOD API failed to load bank from resource: " + resourcePath + RESET);
+        // Simplified bank loading - let FMOD API handle logging internally
+        try {
+            if (FMODAPIWrapper.loadBankFromResource(minecrafttransportsimulator.baseclasses.Point3D.class, resourcePath)) {
+                InterfaceManager.coreInterface.logInfo(GREEN + "FMOD API successfully loaded bank from resource: " + resourcePath + RESET);
+            } else {
+                InterfaceManager.coreInterface.logErrorMain(RED + "FMOD API failed to load bank from resource: " + resourcePath + RESET);
+            }
+        } catch (Exception e) {
+            InterfaceManager.coreInterface.logErrorMain(RED + "FMOD API exception loading bank from resource: " + resourcePath + " - " + e.getMessage() + RESET);
+            // No longer caching FMOD availability
         }
     }
 
 
 
     public void FMODPlaySoundEvent(SoundInstance sound) {
-        // Check if FMOD system is available through API
-        if (!FMODAPI.isAvailable()) {
-            InterfaceManager.coreInterface.logInfo("FMOD system not available, falling back to OpenAL for sound: " + (sound.soundDef != null ? sound.soundDef.name : sound.soundName));
-            playQuickSound(sound);
-            return;
-        }
-
         // Use the FMOD eventName from JSON if available, otherwise fall back to soundPlayingName
         String fmodEventName = (sound.soundDef != null && sound.soundDef.eventName != null)
                 ? sound.soundDef.eventName
@@ -206,32 +234,18 @@ public class InterfaceSound implements IInterfaceSound {
         double posY = sound.entity.position.y;
         double posZ = sound.entity.position.z;
 
-        // Use default volume and pitch (MTS handles complex volume/pitch calculations elsewhere)
-        float volume = 1.0f;
-        float pitch = 1.0f;
-
-        // For looping sounds, check if already playing unless forced
-        if (sound.soundDef != null && sound.soundDef.looping && !sound.soundDef.forceSound) {
-            String loopingKey = fmodEventName + "_" + sound.entity.uniqueUUID + "_looping";
-            if (activeFMODInstances.containsKey(loopingKey)) {
-                return; // Already playing this looping sound
-            }
+        // Always try FMOD first - FMOD API handles availability internally
+        boolean success = false;
+        try {
+            InterfaceManager.coreInterface.logInfo("Attempting to play FMOD event: '" + fmodEventName + "' at position: " + posX + "," + posY + "," + posZ);
+            success = FMODAPIWrapper.playEventSimple(fmodEventName, posX, posY, posZ);
+        } catch (Exception e) {
+            InterfaceManager.coreInterface.logError("FMOD playEventSimple exception for event '" + fmodEventName + "': " + e.getMessage());
+            success = false;
         }
 
-        // Play the sound through FMOD API
-        String instanceId = FMODAPI.playEventAt(fmodEventName, posX, posY, posZ, volume, pitch);
-
-        if (instanceId != null) {
-            // Track this instance for cleanup
-            String instanceKey = fmodEventName + "_" + sound.entity.uniqueUUID + "_" + System.nanoTime();
-            if (sound.soundDef != null && sound.soundDef.looping && !sound.soundDef.forceSound) {
-                instanceKey = fmodEventName + "_" + sound.entity.uniqueUUID + "_looping";
-            }
-
-            // Store the instance ID for tracking (we'll need to modify the storage type)
-            activeFMODInstances.put(instanceKey, Long.parseLong(instanceId));
-
-            InterfaceManager.coreInterface.logInfo(GREEN + "Playing sound event " + '"' + fmodEventName + '"' + " at: " + posX + ", " + posY + ", " + posZ + RESET);
+        if (success) {
+            InterfaceManager.coreInterface.logInfo(GREEN + "FMOD successfully played event " + '"' + fmodEventName + '"' + " at: " + posX + ", " + posY + ", " + posZ + RESET);
         } else {
             InterfaceManager.coreInterface.logInfo(YELLOW + "FMOD API failed to play event: " + fmodEventName + ", falling back to OpenAL using: " + sound.soundPlayingName + RESET);
             // The fallback correctly uses sound.soundPlayingName which is the OGG file
@@ -239,29 +253,18 @@ public class InterfaceSound implements IInterfaceSound {
         }
     }
 
-    /**
-     * Cleans up finished FMOD event instances to prevent memory leaks.
-     * The FMOD API handles most cleanup automatically, so this is simplified.
-     */
-    private static void FMODCleanupFinishedInstances() {
-        if (!FMODAPI.isAvailable() || activeFMODInstances.isEmpty()) return;
-
-        // The FMOD API handles internal cleanup automatically
-        // For now, we'll let the API manage cleanup internally
-        // This method is kept for compatibility but simplified
-
-        InterfaceManager.coreInterface.logInfo("FMOD cleanup handled by API, active instances: " + activeFMODInstances.size());
-    }
+    // FMOD cleanup removed - FMOD API handles all cleanup internally
 
     /**
      * Cleans up all active FMOD event instances.
      */
     private static void FMODCleanupAllInstances() {
-        if (!FMODAPI.isAvailable() || activeFMODInstances.isEmpty()) return;
-
-        // Stop all sounds through the FMOD API
-        FMODAPI.stopAllSounds();
-        activeFMODInstances.clear();
+        // Stop all sounds through the FMOD API - FMOD API handles availability internally
+        try {
+            FMODAPIWrapper.stopAllSounds();
+        } catch (Exception e) {
+            // Ignore cleanup errors - FMOD API handles this internally
+        }
 
         InterfaceManager.coreInterface.logInfo("All FMOD instances stopped and cleared");
     }
@@ -654,7 +657,7 @@ public class InterfaceSound implements IInterfaceSound {
         //We put this into a try block as sound system reloads can cause the thread to get stopped mid-execution.
         try {
             update();
-            FMODSystemUpdate();
+            // FMODSystemUpdate removed - FMOD API handles all updates internally
         } catch (Exception e) {
             e.printStackTrace();
             //Do nothing.  We only get exceptions here if OpenAL isn't ready.
@@ -696,22 +699,32 @@ public class InterfaceSound implements IInterfaceSound {
      * Gets the current FMOD status for real-time config display.
      */
     public static String getCurrentFMODStatus() {
-        if (FMODAPI.isAvailable()) {
-            var status = FMODAPI.getStatus();
-            return status.status;
+        try {
+            var status = FMODAPIWrapper.getStatus();
+            if (status != null) {
+                var statusField = status.getClass().getField("status");
+                return (String) statusField.get(status);
+            }
+            return "Not Available";
+        } catch (Exception e) {
+            return "Not Available";
         }
-        return "Not Available";
     }
 
     /**
      * Gets the current audio system for real-time config display.
      */
     public static String getCurrentAudioSystem() {
-        if (FMODAPI.isAvailable()) {
-            var status = FMODAPI.getStatus();
-            return status.audioSystem;
+        try {
+            var status = FMODAPIWrapper.getStatus();
+            if (status != null) {
+                var audioSystemField = status.getClass().getField("audioSystem");
+                return (String) audioSystemField.get(status);
+            }
+            return "OpenAL";
+        } catch (Exception e) {
+            return "OpenAL";
         }
-        return "OpenAL";
     }
 
     /**
@@ -743,10 +756,15 @@ public class InterfaceSound implements IInterfaceSound {
      * Gets the current FMOD error code for real-time config display.
      */
     public static int getCurrentFMODErrorCode() {
-        if (FMODAPI.isAvailable()) {
-            var status = FMODAPI.getStatus();
-            return status.errorCode;
+        try {
+            var status = FMODAPIWrapper.getStatus();
+            if (status != null) {
+                var errorCodeField = status.getClass().getField("errorCode");
+                return (Integer) errorCodeField.get(status);
+            }
+            return -1; // Not Available
+        } catch (Exception e) {
+            return -1; // Not Available
         }
-        return -1; // Not available
     }
 }

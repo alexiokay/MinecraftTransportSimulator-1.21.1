@@ -87,18 +87,18 @@ public class InterfaceLoader {
     private static List<BuilderBlock> chargerBlocks = new ArrayList<>();
     protected static final DeferredRegister<CreativeModeTab> CREATIVE_TABS = DeferredRegister.create(Registries.CREATIVE_MODE_TAB, InterfaceLoader.MODID);
 
-    public InterfaceLoader(IEventBus modEventBus, ModContainer modContainer) {
-        this.modEventBus = modEventBus;
+    public InterfaceLoader(ModContainer container) {
+        this.modEventBus = container.getEventBus();
         this.gameDirectory = FMLPaths.GAMEDIR.get().toFile().getAbsolutePath();
 
         // Register config for proper NeoForge config GUI using the correct method
-        modContainer.registerConfig(ModConfig.Type.CLIENT, MTSConfig.SPEC);
+        container.registerConfig(ModConfig.Type.CLIENT, MTSConfig.SPEC);
 
         // Register config screen factory only on client side
         if (FMLEnvironment.dist.isClient()) {
             try {
                 // Use reflection to avoid direct client-only imports
-                Class.forName("mcinterface1211.ClientConfigRegistration").getMethod("registerConfigScreen", ModContainer.class).invoke(null, modContainer);
+                Class.forName("mcinterface1211.ClientConfigRegistration").getMethod("registerConfigScreen", ModContainer.class).invoke(null, container);
                 System.out.println("MTS Config screen factory registered for client");
             } catch (Exception e) {
                 System.err.println("Failed to register config screen factory: " + e.getMessage());

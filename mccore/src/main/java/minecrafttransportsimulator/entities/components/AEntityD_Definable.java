@@ -769,13 +769,8 @@ public abstract class AEntityD_Definable<JSONDefinition extends AJSONMultiModelP
                         //Sound should play.
                         //If we aren't playing, or are playing but aren't a looping sound, update.
                         if (playingSound == null || !soundDef.looping) {
-                            // Use FMOD if eventName is specified, otherwise use OpenAL
-                            // Note: FMODPlaySoundEvent will automatically fall back internally if FMOD is not available
-                            if (soundDef.eventName != null && !soundDef.eventName.isEmpty()) {
-                                InterfaceManager.soundInterface.FMODPlaySoundEvent(new SoundInstance(this, soundDef));
-                            } else {
-                                InterfaceManager.soundInterface.playQuickSound(new SoundInstance(this, soundDef));
-                            }
+                            // Use playSmartSound - it decides FMOD vs OpenAL internally
+                            InterfaceManager.soundInterface.playSmartSound(new SoundInstance(this, soundDef), soundDef.eventName);
                         }
                     } else {
                         if (soundDef.looping && playingSound != null) {

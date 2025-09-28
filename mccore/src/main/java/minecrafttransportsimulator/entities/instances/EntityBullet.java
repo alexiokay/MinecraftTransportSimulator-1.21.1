@@ -659,16 +659,10 @@ public class EntityBullet extends AEntityD_Definable<JSONBullet> {
             if (bullet.world.isClient()) {
                 bullet.spawnParticles(0);
 
-                //Smart sound system: Use FMOD if eventName provided, otherwise use original MTS sounds
-                if (bullet.definition.bullet.eventName != null && !bullet.definition.bullet.eventName.isEmpty()) {
-                    // Create FMOD sound instance and call directly - more efficient
-                    JSONSound tempSoundDef = new JSONSound();
-                    tempSoundDef.eventName = bullet.definition.bullet.eventName;
-                    InterfaceManager.soundInterface.FMODPlaySoundEvent(new SoundInstance(bullet, tempSoundDef));
-                } else {
-                    // Use original MTS sound system
-                    bullet.updateSounds(0);
-                }
+                // Use playSmartSound - it decides FMOD vs OpenAL internally and handles all fallback
+                JSONSound tempSoundDef = new JSONSound();
+                tempSoundDef.eventName = bullet.definition.bullet.eventName;
+                InterfaceManager.soundInterface.playSmartSound(new SoundInstance(bullet, tempSoundDef), bullet.definition.bullet.eventName);
             }
         }
         if (gun.currentBullet != null && gun.currentBullet.bulletNumber <= bulletNumber) {
