@@ -1,6 +1,7 @@
 package minecrafttransportsimulator.packloading;
 
 import java.io.File;
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Enumeration;
@@ -234,18 +235,24 @@ public final class PackParser {
         defaultItems.put("default_plane", ItemClassification.PANEL);
 
         String prefixFolders = "/assets/" + packID + "/jsondefs/";
-        String systemName;
         for (Entry<String, ItemClassification> defaultItem : defaultItems.entrySet()) {
+            String systemName = defaultItem.getKey();
             try {
-                systemName = defaultItem.getKey();
                 ItemClassification classification = defaultItem.getValue();
-                AJSONBase itemDef = JSONParser.parseStream(InterfaceManager.coreInterface.getPackResource(prefixFolders + classification.toDirectory() + systemName + ".json"), classification.representingClass, packDef.packID, systemName);
+                String resourcePath = prefixFolders + classification.toDirectory() + systemName + ".json";
+                InputStream resourceStream = InterfaceManager.coreInterface.getPackResource(resourcePath);
+                if (resourceStream == null) {
+                    InterfaceManager.coreInterface.logError("Failed to load default item: " + resourcePath + " - resource not found");
+                    continue;
+                }
+                AJSONBase itemDef = JSONParser.parseStream(resourceStream, classification.representingClass, packDef.packID, systemName);
                 itemDef.packID = packID;
                 itemDef.systemName = systemName;
                 itemDef.classification = classification;
                 itemDef.prefixFolders = prefixFolders;
                 registerItem(itemDef);
             } catch (Exception e) {
+                InterfaceManager.coreInterface.logError("Failed to load default item '" + systemName + "': " + e.getMessage());
                 e.printStackTrace();
             }
         }

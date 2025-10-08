@@ -35,6 +35,7 @@ import minecrafttransportsimulator.entities.instances.EntityPlayerGun;
 import minecrafttransportsimulator.entities.instances.EntityVehicleF_Physics;
 import minecrafttransportsimulator.entities.instances.PartSeat;
 import minecrafttransportsimulator.items.components.AItemBase;
+import minecrafttransportsimulator.items.components.AItemPack;
 import minecrafttransportsimulator.items.components.AItemSubTyped;
 import minecrafttransportsimulator.jsondefs.AJSONMultiModelProvider;
 import minecrafttransportsimulator.mcinterface.AWrapperWorld;
@@ -1214,8 +1215,14 @@ public class WrapperWorld extends AWrapperWorld {
 
                             //If the player is new, add handbooks.
                             if (ConfigSystem.settings.general.giveManualsOnJoin.value && !ConfigSystem.settings.general.joinedPlayers.value.contains(playerUUID)) {
-                                playerWrapper.getInventory().addStack(PackParser.getItem("mts", "handbook_car").getNewStack(null));
-                                playerWrapper.getInventory().addStack(PackParser.getItem("mts", "handbook_plane").getNewStack(null));
+                                AItemPack carHandbook = PackParser.getItem("mts", "handbook_car");
+                                if (carHandbook != null) {
+                                    playerWrapper.getInventory().addStack(carHandbook.getNewStack(null));
+                                }
+                                AItemPack planeHandbook = PackParser.getItem("mts", "handbook_plane");
+                                if (planeHandbook != null) {
+                                    playerWrapper.getInventory().addStack(planeHandbook.getNewStack(null));
+                                }
                                 ConfigSystem.settings.general.joinedPlayers.value.add(playerUUID);
                                 ConfigSystem.saveToDisk();
                             }
