@@ -286,9 +286,6 @@ public abstract class AEntityB_Existing extends AEntityA_Base {
 
                     //Adjust eye position to account for zoom settings.
                     int zoomRequired = 4 + zoomLevel;
-                    if (world.isClient() && InterfaceManager.clientInterface.getClientPlayer().equals(rider)) {
-                        System.out.println("ZOOM DEBUG: cameraMode=" + cameraMode + " zoomLevel=" + zoomLevel + " zoomRequired=" + zoomRequired);
-                    }
                     riderTempPoint.set(0, 0, cameraMode == CameraMode.THIRD_PERSON ? -zoomRequired : zoomRequired).rotate(rider.getOrientation());
                     riderEyePosition.add(riderTempPoint);
 

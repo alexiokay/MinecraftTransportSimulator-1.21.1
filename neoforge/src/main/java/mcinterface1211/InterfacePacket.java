@@ -164,9 +164,6 @@ class InterfacePacket implements IInterfacePacket {
         public static void toBytes(WrapperPacket message, FriendlyByteBuf buf) {
             try {
                 // Don't write packet index here - writeToBuffer() already does that!
-                byte packetIndex = InterfaceManager.packetInterface.getPacketIndex(message.packet);
-                InterfaceManager.coreInterface.logError("PACKET DEBUG: Encoding packet " + message.packet.getClass().getSimpleName() + " with index: " + packetIndex);
-
                 message.packet.writeToBuffer(buf);
             } catch (Exception e) {
                 InterfaceManager.coreInterface.logError("PACKET ERROR: Failed to encode packet! Exception: " + e.getClass().getSimpleName() + ": " + e.getMessage());
