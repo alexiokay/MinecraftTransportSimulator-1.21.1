@@ -76,8 +76,7 @@ public class InterfaceEventsEntityRendering {
                 }
                 //Move the info's setup to the set position of the camera.
                 //This will offset the player's eye position to match the camera.
-                //We do this in first-person mode since third-person adds zoom stuff.
-                ((mcinterface1211.mixin.client.CameraMixin) camera).invoke_setPosition(cameraAdjustedPosition.x, cameraAdjustedPosition.y, cameraAdjustedPosition.z);
+                ((mcinterface1211.mixin.client.CameraAccessor) camera).invoke_setPosition(cameraAdjustedPosition.x, cameraAdjustedPosition.y, cameraAdjustedPosition.z);
                 adjustedCamera = true;
 
                 // FMOD listener position now automatically handled by FMOD API mod
