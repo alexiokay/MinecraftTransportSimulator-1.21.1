@@ -394,7 +394,6 @@ public abstract class EntityManager {
     public void removeEntity(AEntityA_Base entity) {
         // Send removal packet to all clients if we're on the server
         if (!getWorld().isClient() && entity.shouldSync()) {
-            InterfaceManager.coreInterface.logError("ENTITY SYNC DEBUG: Sending removal packet to clients for " + entity.getClass().getSimpleName() + " UUID " + entity.uniqueUUID);
             InterfaceManager.packetInterface.sendToAllClients(new PacketEntityRemove(entity));
         }
 
