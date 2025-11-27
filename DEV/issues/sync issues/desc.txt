@@ -1,0 +1,3 @@
+issue1: player 2 disconnected, player 1 has fire extinguiseh in hand player 2 saw it in air player 1 saw it in its hand. player 2 started experincing game lags
+
+issue2: player 2 drove car and its game crashed, got disconnected. crash report not 
