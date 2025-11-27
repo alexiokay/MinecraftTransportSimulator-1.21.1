@@ -81,10 +81,12 @@ class InterfaceCore implements IInterfaceCore {
                     return stream;
                 }
             } catch (Exception e) {
-                // Continue
+                // Continue to fallback
             }
         }
-        return null;
+
+        // Fallback: Try loading from InterfaceManager class (for dev builds and mod resources)
+        return InterfaceManager.class.getResourceAsStream(resource);
     }
 
 
