@@ -35,6 +35,7 @@
     "config.physics.header": "Vehicle Physics Settings",
     "config.rendering.fancy_lights": "Fancy Lighting Effects",
     "config.rendering.header": "Rendering Settings",
+    "config.rendering.iris_shader_compatibility": "Iris/Oculus Shader Compatibility",
     "config.rendering.render_distance": "Vehicle Render Distance",
     "config.rendering.transparent_windows": "Transparent Windows",
     

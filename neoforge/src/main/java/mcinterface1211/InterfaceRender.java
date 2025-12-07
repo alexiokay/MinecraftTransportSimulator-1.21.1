@@ -632,17 +632,19 @@ public class InterfaceRender implements IInterfaceRender {
             RenderType.CompositeState.CompositeStateBuilder stateBuilder = RenderType.CompositeState.builder();
 
             //Set shader to use.
-            // When Iris shader pack is ACTIVELY RUNNING, use standard Minecraft shaders for compatibility
-            if (ModCompatibility.areShadersEnabled()) {
-                // Iris shader pack is active - use standard Minecraft shaders only
-                // Per Iris documentation: custom shaders are ignored when shader packs are loaded
+            // CRITICAL: Blended lights require MTS custom shaders, GUI needs vanilla shaders
+            // Use vanilla shaders when: (Iris compat ON AND NOT blended lights) OR rendering GUI
+            boolean useVanillaShaders = (ModCompatibility.areShadersEnabled() && !data.enableBrightBlending) || renderingGUI;
+
+            if (useVanillaShaders) {
+                // Iris compatibility mode (non-blended) OR GUI rendering: use vanilla shaders
                 if (data.isTranslucent) {
                     stateBuilder.setShaderState(new RenderStateShard.ShaderStateShard(() -> GameRenderer.getRendertypeEntityTranslucentShader()));
                 } else {
                     stateBuilder.setShaderState(new RenderStateShard.ShaderStateShard(() -> GameRenderer.getRendertypeEntityCutoutShader()));
                 }
             } else if (data.lightingMode.disableTextureShadows) {
-                //This shouldn't use OpenGL lighting, use shader that ignores this.
+                // Use MTS custom shaders for: blended lights, no shader compat, or compat disabled
                 if (data.lightingMode.disableWorldLighting) {
                     stateBuilder.setShaderState(MTS_ENTITY_LIGHTS_SHADER);
                 } else {
@@ -717,7 +719,9 @@ public class InterfaceRender implements IInterfaceRender {
 
     @Override
     public boolean shouldDisableBeamsForShaderCompatibility() {
-        return ModCompatibility.areShadersEnabled();
+        // Always allow beams to render - they'll use vanilla shaders when compatibility mode is on
+        // This way beams work with Iris/Sodium, just not as bright
+        return false;
     }
 
     @Override
@@ -1032,4 +1036,5 @@ public class InterfaceRender implements IInterfaceRender {
         RenderSystem.depthMask(true);
         RenderSystem.defaultBlendFunc();
     });
+
 }

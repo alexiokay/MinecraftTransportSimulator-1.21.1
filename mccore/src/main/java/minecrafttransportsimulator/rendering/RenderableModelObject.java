@@ -262,7 +262,7 @@ public class RenderableModelObject {
             } else {
                 //Set object states and render.
                 boolean isLitTexture = lightDef != null && lightLevel > 0 && !lightDef.emissive && !lightDef.isBeam;
-                if ((renderable.isTranslucent || isLitTexture) == blendingEnabled) {
+                if ((renderable.isTranslucent && blendingEnabled) || (renderable.isTranslucent == blendingEnabled)) {
                     if (lightDef != null && lightDef.isBeam) {
                         //Model that's actually a beam, render it with beam lighting/blending. 
                         renderable.setLightValue(entity.worldLightValue);
@@ -339,8 +339,11 @@ public class RenderableModelObject {
             //Render text on this object.  Only do this on the solid pass.
             for (Entry<JSONText, String> textEntry : entity.text.entrySet()) {
                 JSONText textDef = textEntry.getKey();
-                if (renderable.vertexObject.name.equals(textDef.attachedTo) && ((textDef.lightsUp && entity.renderTextLit()) == blendingEnabled)) {
-                    RenderText.draw3DText(textEntry.getValue(), entity, renderable.transform, textDef, false, blendingEnabled);
+                if (renderable.vertexObject.name.equals(textDef.attachedTo)) {
+                    boolean isLitTexture = textDef.lightsUp && entity.renderTextLit();
+                    if (renderable.isTranslucent == blendingEnabled) {
+                        RenderText.draw3DText(textEntry.getValue(), entity, renderable.transform, textDef, false, isLitTexture);
+                    }
                 }
             }
         }

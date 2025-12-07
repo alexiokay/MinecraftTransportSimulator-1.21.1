@@ -11,6 +11,8 @@ public class ModCompatibility {
 
     // Cached mod presence checks for performance
     private static Boolean hasShaderMod = null;
+    private static Boolean hasSodium = null;
+    private static Boolean hasEmbeddium = null;
 
     /**
      * Check if Iris/Oculus shader mod is installed (not necessarily active).
@@ -23,10 +25,23 @@ public class ModCompatibility {
     }
 
     /**
-     * Check if shaders are actively enabled (not just the mod present).
-     * This checks if a shader pack is actually loaded and running.
+     * Check if shaders are actively enabled AND if compatibility mode is enabled in config.
+     * This checks if a shader pack is actually loaded and running, and if the user wants
+     * to use vanilla shaders for compatibility with shader packs.
+     * Priority: Client config > NeoForge config
      */
     public static boolean areShadersEnabled() {
+        // Check client config first (in-game menu setting)
+        if (minecrafttransportsimulator.systems.ConfigSystem.client != null &&
+            minecrafttransportsimulator.systems.ConfigSystem.client.renderingSettings.shaderCompat != null) {
+            if (!minecrafttransportsimulator.systems.ConfigSystem.client.renderingSettings.shaderCompat.value) {
+                return false;
+            }
+        } else if (!MTSConfig.IRIS_SHADER_COMPATIBILITY.get()) {
+            // Fallback to NeoForge config
+            return false;
+        }
+
         if (!hasShaderMod()) {
             return false;
         }
@@ -64,16 +79,70 @@ public class ModCompatibility {
     }
 
     /**
+     * Check if Sodium is installed (incompatible with custom shaders).
+     */
+    public static boolean hasSodium() {
+        if (hasSodium == null) {
+            hasSodium = ModList.get().isLoaded("sodium");
+        }
+        return hasSodium;
+    }
+
+    /**
+     * Check if Embeddium is installed (compatible with custom shaders).
+     */
+    public static boolean hasEmbeddium() {
+        if (hasEmbeddium == null) {
+            hasEmbeddium = ModList.get().isLoaded("embeddium") || ModList.get().isLoaded("rubidium");
+        }
+        return hasEmbeddium;
+    }
+
+    /**
+     * Check if we're running with Iris + Sodium (known to have rendering issues with custom shaders).
+     */
+    public static boolean hasIrisAndSodium() {
+        return ModList.get().isLoaded("iris") && hasSodium();
+    }
+
+    /**
+     * Check if we're running with Oculus + Embeddium (more compatible with custom shaders).
+     */
+    public static boolean hasOculusAndEmbeddium() {
+        return ModList.get().isLoaded("oculus") && hasEmbeddium();
+    }
+
+    /**
      * Reset cached values (useful for development/testing).
      */
     public static void resetCache() {
         hasShaderMod = null;
+        hasSodium = null;
+        hasEmbeddium = null;
     }
 
     /**
      * Get debug information about detected mod compatibility.
      */
     public static String getDebugInfo() {
-        return "Shader Mod (Iris/Oculus): " + (hasShaderMod() ? "DETECTED" : "not found");
+        String rendering = "UNKNOWN";
+        if (hasIrisAndSodium()) {
+            rendering = "Iris + Sodium (Custom shaders may have issues)";
+        } else if (hasOculusAndEmbeddium()) {
+            rendering = "Oculus + Embeddium (Custom shaders compatible)";
+        } else if (ModList.get().isLoaded("iris")) {
+            rendering = "Iris (no Sodium)";
+        } else if (ModList.get().isLoaded("oculus")) {
+            rendering = "Oculus (no Embeddium)";
+        } else if (hasSodium()) {
+            rendering = "Sodium only";
+        } else if (hasEmbeddium()) {
+            rendering = "Embeddium only";
+        } else {
+            rendering = "Vanilla";
+        }
+
+        return "Rendering: " + rendering +
+               ", Shader Compatibility Mode: " + (MTSConfig.IRIS_SHADER_COMPATIBILITY.get() ? "ENABLED" : "DISABLED");
     }
 }

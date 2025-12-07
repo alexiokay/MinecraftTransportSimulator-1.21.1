@@ -20,6 +20,7 @@ public class MTSConfig {
     public static final ModConfigSpec.BooleanValue FANCY_LIGHTS;
     public static final ModConfigSpec.BooleanValue TRANSPARENT_WINDOWS;
     public static final ModConfigSpec.IntValue RENDER_DISTANCE;
+    public static final ModConfigSpec.BooleanValue IRIS_SHADER_COMPATIBILITY;
 
     // Controls Settings
     public static final ModConfigSpec.BooleanValue MOUSE_YOKE;
@@ -70,6 +71,10 @@ public class MTSConfig {
             .comment("Maximum render distance for vehicles")
             .translation("config.rendering.render_distance")
             .defineInRange("renderDistance", 16, 1, 64);
+        IRIS_SHADER_COMPATIBILITY = BUILDER
+            .comment("Enable Iris/Oculus shader pack compatibility (uses vanilla shaders when shader packs are active). Disable this to force MTS custom shaders for lights even with Iris enabled, which may improve light brightness but could cause compatibility issues with some shader packs.")
+            .translation("config.rendering.iris_shader_compatibility")
+            .define("irisShaderCompatibility", false);
         BUILDER.pop();
 
         BUILDER.push("Controls");
