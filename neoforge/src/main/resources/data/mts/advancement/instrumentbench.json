@@ -1,14 +1,14 @@
 {
-    "parent": "mts:vehiclebench",
+    "parent": "mts:rtfm",
     "display": {
         "icon": {
-        	"item": "mts:mts.wrench"
+        	"id": "mts:mts.instrumentbench"
         	},
         "title": {
-        	"translate": "advancements.mts.wrench.title"
+        	"translate": "advancements.mts.instrumentbench.title"
         	},
         "description": {
-        	"translate": "advancements.mts.wrench.description"
+        	"translate": "advancements.mts.instrumentbench.description"
         	},
         "frame": "task",
     	"show_toast": true,
@@ -16,13 +16,13 @@
     	"hidden": false
     },
     "criteria": {
-        "wrench": {
+        "instrumentbench": {
             "trigger": "minecraft:inventory_changed",
             "conditions": {
             	"items": [
             		{
             			"items": [
-            				"mts:mts.wrench"
+            				"mts:mts.instrumentbench"
             				]
             			}
             		]
@@ -32,7 +32,7 @@
     },
     "requirements": [
         [
-            "wrench"
+            "instrumentbench"
         ]
     ]
 }

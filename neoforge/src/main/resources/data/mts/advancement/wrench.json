@@ -1,14 +1,14 @@
 {
-    "parent": "mts:rtfm",
+    "parent": "mts:vehiclebench",
     "display": {
         "icon": {
-        	"item": "mts:mts.vehiclebench"
+        	"id": "mts:mts.wrench"
         	},
         "title": {
-        	"translate": "advancements.mts.vehiclebench.title"
+        	"translate": "advancements.mts.wrench.title"
         	},
         "description": {
-        	"translate": "advancements.mts.vehiclebench.description"
+        	"translate": "advancements.mts.wrench.description"
         	},
         "frame": "task",
     	"show_toast": true,
@@ -16,13 +16,13 @@
     	"hidden": false
     },
     "criteria": {
-        "vehiclebench": {
+        "wrench": {
             "trigger": "minecraft:inventory_changed",
             "conditions": {
             	"items": [
             		{
             			"items": [
-            				"mts:mts.vehiclebench"
+            				"mts:mts.wrench"
             				]
             			}
             		]
@@ -30,17 +30,9 @@
         	}
         }
     },
-    "rewards": {
-        "recipes": [
-            "mts:key",
-            "mts:paintgun",
-            "mts:ticket",
-            "mts:wrench"
-        ]
-    },
     "requirements": [
         [
-            "vehiclebench"
+            "wrench"
         ]
     ]
 }

@@ -1,14 +1,14 @@
 {
-    "parent": "mts:rtfm",
+    "parent": "mts:vehiclebench",
     "display": {
         "icon": {
-        	"item": "mts:mts.itembench"
+        	"id": "mts:mts.paintgun"
         	},
         "title": {
-        	"translate": "advancements.mts.itembench.title"
+        	"translate": "advancements.mts.paintgun.title"
         	},
         "description": {
-        	"translate": "advancements.mts.itembench.description"
+        	"translate": "advancements.mts.paintgun.description"
         	},
         "frame": "task",
     	"show_toast": true,
@@ -16,13 +16,13 @@
     	"hidden": false
     },
     "criteria": {
-        "itembench": {
+        "paintgun": {
             "trigger": "minecraft:inventory_changed",
             "conditions": {
             	"items": [
             		{
             			"items": [
-            				"mts:mts.itembench"
+            				"mts:mts.paintgun"
             				]
             			}
             		]
@@ -32,7 +32,7 @@
     },
     "requirements": [
         [
-            "itembench"
+            "paintgun"
         ]
     ]
 }

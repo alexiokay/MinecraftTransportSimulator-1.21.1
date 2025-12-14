@@ -2,13 +2,13 @@
     "parent": "mts:rtfm",
     "display": {
         "icon": {
-        	"item": "mts:mts.wheelbench"
+        	"id": "mts:mts.itembench"
         	},
         "title": {
-        	"translate": "advancements.mts.wheelbench.title"
+        	"translate": "advancements.mts.itembench.title"
         	},
         "description": {
-        	"translate": "advancements.mts.wheelbench.description"
+        	"translate": "advancements.mts.itembench.description"
         	},
         "frame": "task",
     	"show_toast": true,
@@ -16,22 +16,23 @@
     	"hidden": false
     },
     "criteria": {
-        "wheelbench": {
+        "itembench": {
             "trigger": "minecraft:inventory_changed",
             "conditions": {
             	"items": [
             		{
             			"items": [
-            				"mts:mts.wheelbench"
+            				"mts:mts.itembench"
             				]
             			}
             		]
             	}
         	}
+        }
     },
     "requirements": [
         [
-            "wheelbench"
+            "itembench"
         ]
     ]
 }

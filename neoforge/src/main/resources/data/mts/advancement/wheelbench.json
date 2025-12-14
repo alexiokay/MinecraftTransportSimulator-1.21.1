@@ -2,13 +2,13 @@
     "parent": "mts:rtfm",
     "display": {
         "icon": {
-        	"item": "mts:mts.custombench"
+        	"id": "mts:mts.wheelbench"
         	},
         "title": {
-        	"translate": "advancements.mts.custombench.title"
+        	"translate": "advancements.mts.wheelbench.title"
         	},
         "description": {
-        	"translate": "advancements.mts.custombench.description"
+        	"translate": "advancements.mts.wheelbench.description"
         	},
         "frame": "task",
     	"show_toast": true,
@@ -16,31 +16,22 @@
     	"hidden": false
     },
     "criteria": {
-        "custombench": {
+        "wheelbench": {
             "trigger": "minecraft:inventory_changed",
             "conditions": {
             	"items": [
             		{
             			"items": [
-            				"mts:mts.custombench"
+            				"mts:mts.wheelbench"
             				]
             			}
             		]
             	}
         	}
-        }
     },
     "requirements": [
         [
-            "custombench"
+            "wheelbench"
         ]
-    ],
-    "rewards": {
-        "experience": 500,
-        "recipes": [
-            "mts:fuelpump",
-            "mts:jumpercable",
-            "mts:jumperpack"
-        ]
-    }
+    ]
 }

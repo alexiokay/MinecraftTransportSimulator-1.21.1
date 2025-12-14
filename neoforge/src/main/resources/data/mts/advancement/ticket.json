@@ -1,14 +1,14 @@
 {
-    "parent": "mts:enginebench",
+    "parent": "mts:vehiclebench",
     "display": {
         "icon": {
-        	"item": "mts:mts.fuelpump"
+        	"id": "mts:mts.ticket"
         	},
         "title": {
-        	"translate": "advancements.mts.fuelpump.title"
+        	"translate": "advancements.mts.ticket.title"
         	},
         "description": {
-        	"translate": "advancements.mts.fuelpump.description"
+        	"translate": "advancements.mts.ticket.description"
         	},
         "frame": "task",
     	"show_toast": true,
@@ -16,13 +16,13 @@
     	"hidden": false
     },
     "criteria": {
-        "fuelpump": {
+        "ticket": {
             "trigger": "minecraft:inventory_changed",
             "conditions": {
             	"items": [
             		{
             			"items": [
-            				"mts:mts.fuelpump"
+            				"mts:mts.ticket"
             				]
             			}
             		]
@@ -32,10 +32,7 @@
     },
     "requirements": [
         [
-            "fuelpump"
+            "ticket"
         ]
-    ],
-    "rewards": {
-        "recipes": ["mts:jerrycan"]
-    }
+    ]
 }

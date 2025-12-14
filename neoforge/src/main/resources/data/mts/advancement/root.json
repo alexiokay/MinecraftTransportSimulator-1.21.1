@@ -1,7 +1,7 @@
 {
     "display": {
         "icon": {
-        	"item": "mts:mts.wrench"
+        	"id": "mts:mts.wrench"
         },
         
         "title": {

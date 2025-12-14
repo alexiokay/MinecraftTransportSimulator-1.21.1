@@ -1,14 +1,14 @@
 {
-    "parent": "mts:enginebench",
+    "parent": "mts:rtfm",
     "display": {
         "icon": {
-        	"item": "mts:mts.jumperpack"
+        	"id": "mts:mts.propellerbench"
         	},
         "title": {
-        	"translate": "advancements.mts.jumperpack.title"
+        	"translate": "advancements.mts.propellerbench.title"
         	},
         "description": {
-        	"translate": "advancements.mts.jumperpack.description"
+        	"translate": "advancements.mts.propellerbench.description"
         	},
         "frame": "task",
     	"show_toast": true,
@@ -16,13 +16,13 @@
     	"hidden": false
     },
     "criteria": {
-        "batteryjumper": {
+        "propellerbench": {
             "trigger": "minecraft:inventory_changed",
             "conditions": {
             	"items": [
             		{
             			"items": [
-            				"mts:mts.jumperpack"
+            				"mts:mts.propellerbench"
             				]
             			}
             		]
@@ -32,7 +32,7 @@
     },
     "requirements": [
         [
-            "batteryjumper"
+            "propellerbench"
         ]
     ]
 }

@@ -2,7 +2,7 @@
     "parent": "mts:root",
     "display": {
         "icon": {
-        	"item": "mts:mts.handbook_car"
+        	"id": "mts:mts.handbook_car"
         },
         "title": {
         	"translate": "advancements.mts.rtfm.title"

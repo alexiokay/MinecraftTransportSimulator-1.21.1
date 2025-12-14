@@ -1,14 +1,14 @@
 {
-    "parent": "mts:seatbench",
+    "parent": "mts:rtfm",
     "display": {
         "icon": {
-        	"item": "mts:mts.fuelhose"
+        	"id": "mts:mts.gunbench"
         	},
         "title": {
-        	"translate": "advancements.mts.fuelhose.title"
+        	"translate": "advancements.mts.gunbench.title"
         	},
         "description": {
-        	"translate": "advancements.mts.fuelhose.description"
+        	"translate": "advancements.mts.gunbench.description"
         	},
         "frame": "task",
     	"show_toast": true,
@@ -16,13 +16,13 @@
     	"hidden": false
     },
     "criteria": {
-        "fuelhose": {
+        "gunbench": {
             "trigger": "minecraft:inventory_changed",
             "conditions": {
             	"items": [
             		{
             			"items": [
-            				"mts:mts.fuelhose"
+            				"mts:mts.gunbench"
             				]
             			}
             		]
@@ -32,7 +32,7 @@
     },
     "requirements": [
         [
-            "fuelhose"
+            "gunbench"
         ]
     ]
 }

@@ -1,14 +1,14 @@
 {
-    "parent": "mts:rtfm",
+    "parent": "mts:vehiclebench",
     "display": {
         "icon": {
-        	"item": "mts:mts.partscanner"
+        	"id": "mts:mts.key"
         	},
         "title": {
-        	"translate": "advancements.mts.partscanner.title"
+        	"translate": "advancements.mts.key.title"
         	},
         "description": {
-        	"translate": "advancements.mts.partscanner.description"
+        	"translate": "advancements.mts.key.description"
         	},
         "frame": "task",
     	"show_toast": true,
@@ -16,13 +16,13 @@
     	"hidden": false
     },
     "criteria": {
-        "partscanner": {
+        "key": {
             "trigger": "minecraft:inventory_changed",
             "conditions": {
             	"items": [
             		{
             			"items": [
-            				"mts:mts.partscanner"
+            				"mts:mts.key"
             				]
             			}
             		]
@@ -32,7 +32,7 @@
     },
     "requirements": [
         [
-            "partscanner"
+            "key"
         ]
     ]
 }

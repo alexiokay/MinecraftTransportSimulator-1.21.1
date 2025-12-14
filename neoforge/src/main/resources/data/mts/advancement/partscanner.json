@@ -2,13 +2,13 @@
     "parent": "mts:rtfm",
     "display": {
         "icon": {
-        	"item": "mts:mts.propellerbench"
+        	"id": "mts:mts.partscanner"
         	},
         "title": {
-        	"translate": "advancements.mts.propellerbench.title"
+        	"translate": "advancements.mts.partscanner.title"
         	},
         "description": {
-        	"translate": "advancements.mts.propellerbench.description"
+        	"translate": "advancements.mts.partscanner.description"
         	},
         "frame": "task",
     	"show_toast": true,
@@ -16,13 +16,13 @@
     	"hidden": false
     },
     "criteria": {
-        "propellerbench": {
+        "partscanner": {
             "trigger": "minecraft:inventory_changed",
             "conditions": {
             	"items": [
             		{
             			"items": [
-            				"mts:mts.propellerbench"
+            				"mts:mts.partscanner"
             				]
             			}
             		]
@@ -32,7 +32,7 @@
     },
     "requirements": [
         [
-            "propellerbench"
+            "partscanner"
         ]
     ]
 }

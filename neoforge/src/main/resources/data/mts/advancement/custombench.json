@@ -1,14 +1,14 @@
 {
-    "parent": "mts:vehiclebench",
+    "parent": "mts:rtfm",
     "display": {
         "icon": {
-        	"item": "mts:mts.key"
+        	"id": "mts:mts.custombench"
         	},
         "title": {
-        	"translate": "advancements.mts.key.title"
+        	"translate": "advancements.mts.custombench.title"
         	},
         "description": {
-        	"translate": "advancements.mts.key.description"
+        	"translate": "advancements.mts.custombench.description"
         	},
         "frame": "task",
     	"show_toast": true,
@@ -16,13 +16,13 @@
     	"hidden": false
     },
     "criteria": {
-        "key": {
+        "custombench": {
             "trigger": "minecraft:inventory_changed",
             "conditions": {
             	"items": [
             		{
             			"items": [
-            				"mts:mts.key"
+            				"mts:mts.custombench"
             				]
             			}
             		]
@@ -32,7 +32,15 @@
     },
     "requirements": [
         [
-            "key"
+            "custombench"
         ]
-    ]
+    ],
+    "rewards": {
+        "experience": 500,
+        "recipes": [
+            "mts:fuelpump",
+            "mts:jumpercable",
+            "mts:jumperpack"
+        ]
+    }
 }

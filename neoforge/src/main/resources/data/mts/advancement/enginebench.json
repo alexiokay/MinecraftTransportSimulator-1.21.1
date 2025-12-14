@@ -1,14 +1,14 @@
 {
-    "parent": "mts:fuelpump",
+    "parent": "mts:rtfm",
     "display": {
         "icon": {
-        	"item": "mts:mts.jerrycan"
+        	"id": "mts:mts.enginebench"
         	},
         "title": {
-        	"translate": "advancements.mts.jerrycan.title"
+        	"translate": "advancements.mts.enginebench.title"
         	},
         "description": {
-        	"translate": "advancements.mts.jerrycan.description"
+        	"translate": "advancements.mts.enginebench.description"
         	},
         "frame": "task",
     	"show_toast": true,
@@ -16,13 +16,13 @@
     	"hidden": false
     },
     "criteria": {
-        "jerrycan": {
+        "enginebench": {
             "trigger": "minecraft:inventory_changed",
             "conditions": {
             	"items": [
             		{
             			"items": [
-            				"mts:mts.jerrycan"
+            				"mts:mts.enginebench"
             				]
             			}
             		]
@@ -32,7 +32,14 @@
     },
     "requirements": [
         [
-            "jerrycan"
+            "enginebench"
         ]
-    ]
+    ],
+    "rewards": {
+        "recipes": [
+            "mts:fuelpump",
+            "mts:jumpercable",
+            "mts:jumperpack"
+        ]
+    }
 }
