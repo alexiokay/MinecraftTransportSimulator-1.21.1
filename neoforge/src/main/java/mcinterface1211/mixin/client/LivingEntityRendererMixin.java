@@ -114,10 +114,10 @@ public abstract class LivingEntityRendererMixin<T extends LivingEntity> extends 
             //Check if we are holding a gun.  This is the only other time
             //we apply player tweaks besides riding in a vehicle.
             EntityPlayerGun gunEntity = EntityPlayerGun.playerClientGuns.get(pEntity.getUUID());
-            if (gunEntity != null && gunEntity.activeGun != null) {
+            if (gunEntity != null && gunEntity.isValid && gunEntity.activeGun != null) {
                 Player player = (Player) pEntity;
 
-                //Remove the held item from the enitty's hand
+                //Remove the held item from the entity's hand
                 heldStackHolder = player.getMainHandItem();
                 player.getInventory().setItem(player.getInventory().selected, ItemStack.EMPTY);
             }

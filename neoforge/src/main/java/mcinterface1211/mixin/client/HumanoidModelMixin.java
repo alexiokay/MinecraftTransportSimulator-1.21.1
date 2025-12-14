@@ -70,7 +70,7 @@ public abstract class HumanoidModelMixin<T extends LivingEntity> {
 
             if (entity instanceof Player) {
                 EntityPlayerGun gunEntity = EntityPlayerGun.playerClientGuns.get(entity.getUUID());
-                if (gunEntity != null && gunEntity.activeGun != null) {
+                if (gunEntity != null && gunEntity.isValid && gunEntity.activeGun != null) {
                     //Get arm rotations.
                     Point3D heldVector;
                     if (gunEntity.activeGun.isHandHeldGunAimed) {

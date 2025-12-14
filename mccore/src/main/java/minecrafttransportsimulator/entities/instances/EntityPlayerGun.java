@@ -1,8 +1,8 @@
 package minecrafttransportsimulator.entities.instances;
 
-import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 import minecrafttransportsimulator.baseclasses.BoundingBox;
 import minecrafttransportsimulator.baseclasses.RotationMatrix;
@@ -32,8 +32,8 @@ import minecrafttransportsimulator.packloading.PackParser;
  * @author don_bruce
  */
 public class EntityPlayerGun extends AEntityF_Multipart<JSONDummyPartProvider> {
-    public static final Map<UUID, EntityPlayerGun> playerClientGuns = new HashMap<>();
-    public static final Map<UUID, EntityPlayerGun> playerServerGuns = new HashMap<>();
+    public static final Map<UUID, EntityPlayerGun> playerClientGuns = new ConcurrentHashMap<>();
+    public static final Map<UUID, EntityPlayerGun> playerServerGuns = new ConcurrentHashMap<>();
 
     public final IWrapperPlayer player;
     private final RotationMatrix handRotation = new RotationMatrix();
@@ -105,6 +105,13 @@ public class EntityPlayerGun extends AEntityF_Multipart<JSONDummyPartProvider> {
 
     @Override
     public void update() {
+        //Save previous position/motion BEFORE super.update() copies them, since we modify position after super.update().
+        //This is required for proper interpolation during rendering - without this, prevPosition == position
+        //and the gun appears to "jump" instead of smoothly following the player.
+        prevPosition.set(position);
+        prevMotion.set(motion);
+        prevOrientation.set(orientation);
+
         super.update();
         //Make sure player is still valid and haven't left the server.
         if (player != null && player.isValid()) {
