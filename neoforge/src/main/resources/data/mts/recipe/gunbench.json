@@ -7,19 +7,20 @@
     ],
     "key": {
         "a": {
-            "tag": "forge:storage_blocks/iron"
+            "tag": "c:storage_blocks/iron"
         },
         "b": {
             "item": "minecraft:diamond"
         },
         "c": {
-            "tag": "forge:ingots/iron"
+            "tag": "c:ingots/iron"
         },
         "d": {
             "item": "minecraft:smooth_stone"
         }
     },
     "result": {
-        "item": "mts:mts.gunbench"
+        "id": "mts:mts.gunbench",
+        "count": 1
     }
 }

@@ -13,13 +13,14 @@
             "item": "minecraft:dispenser"
         },
         "c": {
-            "tag": "forge:ingots/iron"
+            "tag": "c:ingots/iron"
         },
         "d": {
             "item": "minecraft:stick"
         }
     },
     "result": {
-        "item": "mts:mts.paintgun"
+        "id": "mts:mts.paintgun",
+        "count": 1
     }
 }

@@ -6,6 +6,7 @@
         }
     ],
     "result": {
-        "item": "mts:mts.key"
+        "id": "mts:mts.key",
+        "count": 1
     }
 }

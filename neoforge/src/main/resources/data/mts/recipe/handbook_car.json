@@ -14,6 +14,7 @@
         }
     },
     "result": {
-        "item": "mts:mts.handbook_car"
+        "id": "mts:mts.handbook_car",
+        "count": 1
     }
 }

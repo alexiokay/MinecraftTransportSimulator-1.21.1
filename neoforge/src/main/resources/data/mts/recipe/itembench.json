@@ -7,19 +7,20 @@
     ],
     "key": {
         "a": {
-            "tag": "forge:ingots/iron"
+            "tag": "c:ingots/iron"
         },
         "b": {
             "item": "minecraft:glass_pane"
         },
         "c": {
-            "tag": "forge:ingots/copper"
+            "tag": "c:ingots/copper"
         },
         "d": {
             "item": "minecraft:comparator"
         }
     },
     "result": {
-        "item": "mts:mts.itembench"
+        "id": "mts:mts.itembench",
+        "count": 1
     }
 }

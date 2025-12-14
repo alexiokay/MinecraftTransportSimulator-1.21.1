@@ -16,6 +16,7 @@
         }
     },
     "result": {
-        "item": "mts:mts.ticket"
+        "id": "mts:mts.ticket",
+        "count": 1
     }
 }

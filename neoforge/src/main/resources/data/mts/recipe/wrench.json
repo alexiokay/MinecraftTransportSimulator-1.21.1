@@ -7,10 +7,11 @@
     ],
     "key": {
         "a": {
-            "tag": "forge:ingots/iron"
+            "tag": "c:ingots/iron"
         }
     },
     "result": {
-        "item": "mts:mts.wrench"
+        "id": "mts:mts.wrench",
+        "count": 1
     }
 }

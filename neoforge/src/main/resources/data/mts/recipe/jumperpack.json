@@ -7,7 +7,7 @@
     ],
     "key": {
         "a": {
-            "tag": "forge:ingots/iron"
+            "tag": "c:ingots/iron"
         },
         "b": {
             "item": "mts:mts.jumpercable"
@@ -19,10 +19,11 @@
             "item": "minecraft:redstone"
         },
         "e": {
-            "tag": "forge:storage_blocks/copper"
+            "tag": "c:storage_blocks/copper"
         }
     },
     "result": {
-        "item": "mts:mts.jumperpack"
+        "id": "mts:mts.jumperpack",
+        "count": 1
     }
 }

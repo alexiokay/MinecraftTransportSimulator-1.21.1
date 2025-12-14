@@ -7,13 +7,14 @@
     ],
     "key": {
         "a": {
-            "tag": "forge:nuggets/iron"
+            "tag": "c:nuggets/iron"
         },
         "b": {
             "item": "minecraft:clay_ball"
         }
     },
     "result": {
-        "item": "mts:mts.key"
+        "id": "mts:mts.key",
+        "count": 1
     }
 }

@@ -13,10 +13,11 @@
             "item": "minecraft:heavy_weighted_pressure_plate"
         },
         "c": {
-            "tag": "forge:ingots/iron"
+            "tag": "c:ingots/iron"
         }
     },
     "result": {
-        "item": "mts:mts.seatbench"
+        "id": "mts:mts.seatbench",
+        "count": 1
     }
 }

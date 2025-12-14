@@ -1,28 +1,29 @@
 {
     "type": "minecraft:crafting_shaped",
     "pattern": [
-        "a  ",
-        "ebb",
-        "c d"
+        " a ",
+        "bcd",
+        "ece"
     ],
     "key": {
         "a": {
             "item": "minecraft:glass_pane"
         },
         "b": {
-            "item": "minecraft:heavy_weighted_pressure_plate"
+            "item": "minecraft:red_dye"
         },
         "c": {
-            "item": "minecraft:comparator"
+            "item": "minecraft:bucket"
         },
         "d": {
-            "tag": "forge:ingots/iron"
+            "item": "mts:mts.fuelhose"
         },
         "e": {
-            "tag": "forge:ingots/copper"
+            "tag": "c:ingots/iron"
         }
     },
     "result": {
-        "item": "mts:mts.decorbench"
+        "id": "mts:mts.fuelpump",
+        "count": 1
     }
 }

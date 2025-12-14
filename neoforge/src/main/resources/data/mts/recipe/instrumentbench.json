@@ -10,7 +10,7 @@
             "item": "minecraft:lantern"
         },
         "b": {
-            "tag": "forge:ingots/iron"
+            "tag": "c:ingots/iron"
         },
         "c": {
             "item": "minecraft:clock"
@@ -19,10 +19,11 @@
             "tag": "minecraft:planks"
         },
         "e": {
-            "tag": "forge:fences/wooden"
+            "tag": "c:fences/wooden"
         }
     },
     "result": {
-        "item": "mts:mts.instrumentbench"
+        "id": "mts:mts.instrumentbench",
+        "count": 1
     }
 }

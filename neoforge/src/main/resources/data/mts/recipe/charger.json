@@ -7,22 +7,23 @@
     ],
     "key": {
         "a": {
-            "tag": "forge:ingots/iron"
+            "tag": "c:ingots/iron"
         },
         "b": {
-            "tag": "forge:ingots/gold"
+            "tag": "c:ingots/gold"
         },
         "c": {
-            "tag": "forge:storage_blocks/redstone"
+            "tag": "c:storage_blocks/redstone"
         },
         "d": {
             "item": "mts:mts.jumpercable"
         },
         "e": {
-            "tag": "forge:storage_blocks/copper"
+            "tag": "c:storage_blocks/copper"
         }
     },
     "result": {
-        "item": "mts:mts.charger"
+        "id": "mts:mts.charger",
+        "count": 1
     }
 }

@@ -19,10 +19,11 @@
             "item": "minecraft:writable_book"
         },
         "e": {
-            "tag": "forge:fences/wooden"
+            "tag": "c:fences/wooden"
         }
     },
     "result": {
-        "item": "mts:mts.vehiclebench"
+        "id": "mts:mts.vehiclebench",
+        "count": 1
     }
 }
