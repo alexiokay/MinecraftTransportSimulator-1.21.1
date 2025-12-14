@@ -909,16 +909,13 @@ public class InterfaceRender implements IInterfaceRender {
             for (GUIComponentItem component : stacksToRender) {
                 //Double-check the stack is still present, it might have been un-set since this call.
                 if ((WrapperItemStack) component.stackToRender != null) {
-                    //Apply existing transform.
-                    //Need to use RenderSystem here, since we can't access the stack directly for rendering scaling.
-                    // RenderSystem.getModelViewStack() returns Matrix4fStack in older versions but PoseStack in 1.21.1
-                    // Creating a new PoseStack for transform operations
-                    PoseStack posestack = new PoseStack();
-                    posestack.pushPose();
+                    //Apply existing transform using Matrix4fStack from RenderSystem (changed from PoseStack in 1.21.1).
+                    org.joml.Matrix4fStack modelViewStack = RenderSystem.getModelViewStack();
+                    modelViewStack.pushMatrix();
                     //Need to translate the z-offset to our value, which includes a -100 for the default added value.
-                    posestack.translate(0, 0, (float) (component.translation.z - 100));
+                    modelViewStack.translate(0, 0, (float) (component.translation.z - 100));
                     if (component.scale != 1.0) {
-                        posestack.scale(component.scale, component.scale, 1.0F);
+                        modelViewStack.scale(component.scale, component.scale, 1.0F);
                         RenderSystem.applyModelViewMatrix();
                         // Check if this is a pack item and render a simple placeholder instead of the broken model
                         if (isPackItem(((WrapperItemStack) component.stackToRender).stack)) {
@@ -935,7 +932,7 @@ public class InterfaceRender implements IInterfaceRender {
                             mcGUI.renderItem(((WrapperItemStack) component.stackToRender).stack, (int) component.translation.x, (int) -component.translation.y);
                         }
                     }
-                    posestack.popPose();
+                    modelViewStack.popMatrix();
                     RenderSystem.applyModelViewMatrix();
                 }
             }
