@@ -632,12 +632,14 @@ public class InterfaceRender implements IInterfaceRender {
             RenderType.CompositeState.CompositeStateBuilder stateBuilder = RenderType.CompositeState.builder();
 
             //Set shader to use.
-            // CRITICAL: Blended lights require MTS custom shaders, GUI needs vanilla shaders
-            // Use vanilla shaders when: (Iris compat ON AND NOT blended lights) OR rendering GUI
-            boolean useVanillaShaders = (ModCompatibility.areShadersEnabled() && !data.enableBrightBlending) || renderingGUI;
+            // CRITICAL: Blended lights require MTS custom shaders
+            // GUI rendering with disableWorldLighting also needs MTS shaders to avoid vanilla lightmap darkening
+            // Use vanilla shaders when: (Iris compat ON AND NOT blended lights) OR (rendering GUI AND NOT disabling world lighting)
+            boolean useVanillaShaders = (ModCompatibility.areShadersEnabled() && !data.enableBrightBlending) ||
+                                        (renderingGUI && !data.lightingMode.disableWorldLighting);
 
             if (useVanillaShaders) {
-                // Iris compatibility mode (non-blended) OR GUI rendering: use vanilla shaders
+                // Iris compatibility mode (non-blended) OR GUI rendering with world lighting: use vanilla shaders
                 if (data.isTranslucent) {
                     stateBuilder.setShaderState(new RenderStateShard.ShaderStateShard(() -> GameRenderer.getRendertypeEntityTranslucentShader()));
                 } else {
