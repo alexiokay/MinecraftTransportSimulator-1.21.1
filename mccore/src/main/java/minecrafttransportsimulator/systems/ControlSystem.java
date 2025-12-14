@@ -49,6 +49,7 @@ public final class ControlSystem {
 
     private static double throttleRequestLastCheck;
     private static double brakeRequestLastCheck;
+    private static boolean wasUsingShifter = false;
 
     private static EntityInteractResult interactResult = null;
 
@@ -584,10 +585,18 @@ public final class ControlSystem {
             } else {
                 gearNumber = 11;
             }
+            wasUsingShifter = true;
             powered.engines.forEach(engine -> {
                 InterfaceManager.packetInterface.sendToServer(new PacketEntityVariableSet(engine.shiftSelectionVar, gearNumber));
             });
         } else {
+            // Clear shiftSelectionVar when switching from shifter mode to normal mode
+            if (wasUsingShifter) {
+                wasUsingShifter = false;
+                powered.engines.forEach(engine -> {
+                    InterfaceManager.packetInterface.sendToServer(new PacketEntityVariableSet(engine.shiftSelectionVar, 0));
+                });
+            }
             if (ControlsKeyboardDynamic.CAR_SHIFT_NU.isPressed() || ControlsKeyboardDynamic.CAR_SHIFT_ND.isPressed()) {
                 powered.engines.forEach(engine -> {
                     InterfaceManager.packetInterface.sendToServer(new PacketEntityVariableToggle(engine.shiftNeutralVar));
