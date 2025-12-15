@@ -27,6 +27,18 @@ import net.neoforged.neoforge.event.level.LevelEvent;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 
+/**
+ * WrapperPlayer event handlers are registered via this separate inner class
+ * to avoid inheritance issues with EventBusSubscriber.
+ */
+@EventBusSubscriber
+class WrapperPlayerEvents {
+    @SubscribeEvent
+    public static void onIVWorldUnload(LevelEvent.Unload event) {
+        WrapperPlayer.clearPlayerWrappers(event);
+    }
+}
+
 public class WrapperPlayer extends WrapperEntity implements IWrapperPlayer {
     private static final Map<Player, WrapperPlayer> playerClientWrappers = new HashMap<>();
     private static final Map<Player, WrapperPlayer> playerServerWrappers = new HashMap<>();
@@ -168,14 +180,15 @@ public class WrapperPlayer extends WrapperEntity implements IWrapperPlayer {
     }
 
     /**
-     * Remove all entities from our maps if we unload the world.  This will cause duplicates if we don't.
+     * Remove all player wrappers from our maps if we unload the world.  This will cause duplicates if we don't.
+     * Called from WrapperPlayerEvents to avoid EventBusSubscriber inheritance issues.
      */
-    @SubscribeEvent
-    public static void onIVWorldUnload(LevelEvent.Unload event) {
+    static void clearPlayerWrappers(LevelEvent.Unload event) {
         if (event.getLevel().isClientSide()) {
             playerClientWrappers.keySet().removeIf(entity1 -> event.getLevel() == entity1.level());
         } else {
             playerServerWrappers.keySet().removeIf(entity1 -> event.getLevel() == entity1.level());
         }
     }
+
 }

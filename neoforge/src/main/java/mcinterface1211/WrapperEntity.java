@@ -17,6 +17,7 @@ import minecrafttransportsimulator.mcinterface.AWrapperWorld;
 import minecrafttransportsimulator.mcinterface.IWrapperEntity;
 import minecrafttransportsimulator.mcinterface.IWrapperNBT;
 import minecrafttransportsimulator.mcinterface.IWrapperPlayer;
+import minecrafttransportsimulator.mcinterface.InterfaceManager;
 import minecrafttransportsimulator.systems.ConfigSystem;
 import net.minecraft.core.Holder;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -41,6 +42,7 @@ import net.minecraft.world.item.LeadItem;
 import net.minecraft.world.item.alchemy.Potion;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.event.level.LevelEvent;
+import net.neoforged.neoforge.event.entity.EntityTeleportEvent;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 
@@ -499,6 +501,23 @@ public class WrapperEntity implements IWrapperEntity {
             entityClientWrappers.keySet().removeIf(entity1 -> event.getLevel() == entity1.level());
         } else {
             entityServerWrappers.keySet().removeIf(entity1 -> event.getLevel() == entity1.level());
+        }
+    }
+
+    /**
+     * Force dismount players from MTS vehicles before teleportation.
+     * This prevents position desync issues where the client and server disagree
+     * about the player's position after teleport.
+     */
+    @SubscribeEvent
+    public static void onEntityTeleport(EntityTeleportEvent.TeleportCommand event) {
+        if (event.getEntity() instanceof Player player) {
+            if (player.getVehicle() instanceof BuilderEntityLinkedSeat seat) {
+                if (!player.level().isClientSide && seat.entity != null) {
+                    seat.entity.removeRider();
+                    player.stopRiding();
+                }
+            }
         }
     }
 }

@@ -114,8 +114,11 @@ public abstract class ABuilderEntityBase extends Entity {
         }
     }
 
-    public void lerpTo(double pX, double pY, double pZ, float pYRot, float pXRot, int pLerpSteps, boolean pTeleport) {
+    @Override
+    public void lerpTo(double pX, double pY, double pZ, float pYRot, float pXRot, int pLerpSteps) {
         //Overridden due to stupid tracker behavior.
+        //Without this override, MC will interpolate entity positions during teleport,
+        //causing riders to end up in wrong positions.
     }
 
     @Override
