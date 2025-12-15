@@ -150,9 +150,6 @@ public class BuilderEntityExisting extends ABuilderEntityBase {
                 try {
                     WrapperNBT data = new WrapperNBT(lastLoadedNBT);
                     String entityId = lastLoadedNBT.getString("entityid");
-                    InterfaceManager.coreInterface.logError("ENTITY DEBUG: Attempting to load entity with ID: '" + entityId + "'");
-                    InterfaceManager.coreInterface.logError("ENTITY DEBUG: Available entity IDs: " + entityMap.keySet());
-                    InterfaceManager.coreInterface.logError("ENTITY DEBUG: EntityMap size: " + entityMap.size());
 
                     if (entityMap.get(entityId) == null) {
                         // Entity factory not found - this could be a race condition during startup
@@ -174,24 +171,27 @@ public class BuilderEntityExisting extends ABuilderEntityBase {
                         }
                     }
 
-                    // Entity factory found - proceed with loading
-                    entity = entityMap.get(entityId).restoreEntityFromData(worldWrapper, data);
-                    entity.world.addEntity(entity);
-                    if (entity instanceof AEntityF_Multipart) {
-                        ((AEntityF_Multipart<?>) entity).addPartsPostAddition(null, data);
+                    // CRITICAL: Check if an MTS entity with this UUID already exists
+                    // This prevents duplicate entity creation during chunk reload/teleportation
+                    java.util.UUID savedUUID = data.getUUID("uniqueUUID");
+                    AEntityB_Existing existingEntity = savedUUID != null ? worldWrapper.getEntity(savedUUID) : null;
+
+                    if (existingEntity != null && existingEntity.isValid) {
+                        // Entity already exists in MTS world - just reconnect to it
+                        entity = existingEntity;
+                    } else {
+                        // Entity doesn't exist - create it normally
+                        entity = entityMap.get(entityId).restoreEntityFromData(worldWrapper, data);
+                        entity.world.addEntity(entity);
+                        if (entity instanceof AEntityF_Multipart) {
+                            ((AEntityF_Multipart<?>) entity).addPartsPostAddition(null, data);
+                        }
                     }
                     loadedFromSavedNBT = true;
                     lastLoadedNBT = null;
-
-                    // Log successful recovery if we had to retry
-                    if (entityLoadRetries > 0) {
-                        InterfaceManager.coreInterface.logError("ENTITY RECOVERY: SUCCESS - Entity '" + entityId + "' loaded successfully after " + entityLoadRetries + " attempts");
-                    }
                 } catch (Exception e) {
-                    InterfaceManager.coreInterface.logError("ENTITY RECOVERY: Exception during entity loading (attempt " + (entityLoadRetries + 1) + ")");
                     InterfaceManager.coreInterface.logError("Failed to load entity on builder from saved NBT.  Did a pack change?");
                     InterfaceManager.coreInterface.logError(e.getMessage());
-                    e.printStackTrace();
                     discard();
                 }
             }
