@@ -146,7 +146,17 @@ public class BuilderGUI extends Screen {
 
     @Override
     public void renderBackground(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTicks) {
-        // Don't render background or blur - MTS handles its own rendering through overlay system
+        // Don't render default background/blur - MTS handles its own background rendering
+    }
+
+    @Override
+    public void render(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTicks) {
+        // Render modal GUIs (those that capture player input like P config, U panel) directly in Screen.render()
+        // This makes them immune to other mods cancelling overlay events
+        if (gui.capturesPlayer()) {
+            InterfaceRender.renderGUIScreen(guiGraphics, gui, mouseX, mouseY, width, height, partialTicks);
+        }
+        // Non-capturing GUIs (overlays) are still rendered in the overlay event for proper layering
     }
 
     /**

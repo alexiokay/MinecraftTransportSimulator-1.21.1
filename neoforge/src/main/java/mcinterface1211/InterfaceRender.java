@@ -880,19 +880,19 @@ public class InterfaceRender implements IInterfaceRender {
         //Render main pass, then blended pass.
         int displayGUIIndex = 0;
         for (AGUIBase gui : AGUIBase.activeGUIs) {
+            // Skip modal GUIs (capturesPlayer) - they are rendered via Screen.render() in BuilderGUI
+            // This makes them immune to other mods cancelling overlay events
+            if (gui.capturesPlayer()) {
+                continue;
+            }
             // Check if screen dimensions have changed and force GUI re-initialization
             boolean screenSizeChanged = gui.hasScreenSizeChanged(screenWidth, screenHeight);
             if (updateGUIs || gui.components.isEmpty() || screenSizeChanged) {
                 gui.setupComponentsInit(screenWidth, screenHeight);
             }
             matrixStack.pushPose();
-            if (gui.capturesPlayer()) {
-                //Translate in front of the main GUI components.
-                matrixStack.translate(0, 0, 250);
-            } else {
-                //Translate far enough to render behind the chat window.
-                matrixStack.translate(0, 0, -500 + 250 * displayGUIIndex++);
-            }
+            //Translate far enough to render behind the chat window.
+            matrixStack.translate(0, 0, -500 + 250 * displayGUIIndex++);
             gui.render(mouseX, mouseY, false, partialTicks);
             guiBuffer.endBatch();
             //Not needed, since we can't draw to custom buffers with GUIs.
@@ -944,6 +944,93 @@ public class InterfaceRender implements IInterfaceRender {
         }
 
         // NeoForge 1.21.1: Restore render state after GUI rendering
+        RenderSystem.enableDepthTest();
+        RenderSystem.disableBlend();
+
+        matrixStack.popPose();
+        renderingGUI = false;
+    }
+
+    /**
+     * Renders a single GUI directly from Screen.render() - used for modal GUIs (P config, U panel).
+     * This bypasses the overlay event system making it immune to other mods cancelling events.
+     * Called from BuilderGUI.render() for GUIs where capturesPlayer() returns true.
+     */
+    public static void renderGUIScreen(GuiGraphics mcGUI, AGUIBase gui, int mouseX, int mouseY, int screenWidth, int screenHeight, float partialTicks) {
+        // Skip if GUI is not in active list (already closed)
+        if (!AGUIBase.activeGUIs.contains(gui)) {
+            return;
+        }
+
+        matrixStack = mcGUI.pose();
+        matrixStack.pushPose();
+        renderingGUI = true;
+
+        // Set up render state
+        RenderSystem.enableBlend();
+        RenderSystem.defaultBlendFunc();
+        RenderSystem.disableDepthTest();
+        RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
+
+        ByteBufferBuilder byteBufferBuilder = new ByteBufferBuilder(256);
+        MultiBufferSource.BufferSource guiBuffer = MultiBufferSource.immediate(byteBufferBuilder);
+        renderBuffer = guiBuffer;
+
+        // Set Y-axis to inverted to have correct orientation
+        matrixStack.scale(1.0F, -1.0F, 1.0F);
+
+        // Initialize GUI components if needed
+        boolean screenSizeChanged = gui.hasScreenSizeChanged(screenWidth, screenHeight);
+        if (gui.components.isEmpty() || screenSizeChanged) {
+            gui.setupComponentsInit(screenWidth, screenHeight);
+        }
+
+        matrixStack.pushPose();
+        // Translate in front for modal GUI
+        matrixStack.translate(0, 0, 250);
+
+        // Render main pass (non-blended)
+        gui.render(mouseX, mouseY, false, partialTicks);
+        guiBuffer.endBatch();
+
+        // Render blended pass
+        RenderSystem.enableBlend();
+        gui.render(mouseX, mouseY, true, partialTicks);
+        guiBuffer.endBatch();
+        RenderSystem.disableBlend();
+
+        // Render item stacks in standard GUI reference frame
+        matrixStack.scale(1.0F, -1.0F, 1.0F);
+        for (GUIComponentItem component : stacksToRender) {
+            if ((WrapperItemStack) component.stackToRender != null) {
+                org.joml.Matrix4fStack modelViewStack = RenderSystem.getModelViewStack();
+                modelViewStack.pushMatrix();
+                modelViewStack.translate(0, 0, (float) (component.translation.z - 100));
+                if (component.scale != 1.0) {
+                    modelViewStack.scale(component.scale, component.scale, 1.0F);
+                    RenderSystem.applyModelViewMatrix();
+                    if (isPackItem(((WrapperItemStack) component.stackToRender).stack)) {
+                        renderPackItemPlaceholderScaled(mcGUI, component);
+                    } else {
+                        mcGUI.renderItem(((WrapperItemStack) component.stackToRender).stack, (int) (component.translation.x / component.scale), (int) (-component.translation.y / component.scale) + 1);
+                    }
+                } else {
+                    RenderSystem.applyModelViewMatrix();
+                    if (isPackItem(((WrapperItemStack) component.stackToRender).stack)) {
+                        renderPackItemPlaceholder(mcGUI, component);
+                    } else {
+                        mcGUI.renderItem(((WrapperItemStack) component.stackToRender).stack, (int) component.translation.x, (int) -component.translation.y);
+                    }
+                }
+                modelViewStack.popMatrix();
+                RenderSystem.applyModelViewMatrix();
+            }
+        }
+        stacksToRender.clear();
+
+        matrixStack.popPose();
+
+        // Restore render state
         RenderSystem.enableDepthTest();
         RenderSystem.disableBlend();
 

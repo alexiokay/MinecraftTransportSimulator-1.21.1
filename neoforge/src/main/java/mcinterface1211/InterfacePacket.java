@@ -41,7 +41,6 @@ class InterfacePacket implements IInterfacePacket {
 
             // Set initialized IMMEDIATELY to prevent any race conditions
             initialized = true;
-            InterfaceManager.coreInterface.logError("PACKET DEBUG: Initializing packet system for first time");
             registrar = payloadRegistrar;
 
         // Register the main wrapper packet payload for bidirectional communication
@@ -52,7 +51,6 @@ class InterfacePacket implements IInterfacePacket {
                 WrapperPacket.STREAM_CODEC,
                 WrapperPacket::handle
             );
-            InterfaceManager.coreInterface.logError("PACKET DEBUG: Successfully registered bidirectional packet");
         } catch (Exception e) {
             InterfaceManager.coreInterface.logError("PACKET ERROR: Failed to register bidirectional packet: " + e.getMessage());
             e.printStackTrace();
@@ -145,14 +143,10 @@ class InterfacePacket implements IInterfacePacket {
         public static WrapperPacket fromBytes(FriendlyByteBuf buf) {
             try {
                 byte packetIndex = buf.readByte();
-                InterfaceManager.coreInterface.logError("PACKET DEBUG: Decoding packet with index: " + packetIndex);
-
                 Class<? extends APacketBase> packetClass = packetMappings.get(packetIndex);
                 if (packetClass == null) {
                     throw new IllegalStateException("No packet class registered for index " + packetIndex + ". Registered indices: " + packetMappings.keySet());
                 }
-
-                InterfaceManager.coreInterface.logError("PACKET DEBUG: Creating packet of class: " + packetClass.getSimpleName());
                 return new WrapperPacket(packetClass.getConstructor(ByteBuf.class).newInstance(buf));
             } catch (Exception e) {
                 InterfaceManager.coreInterface.logError("PACKET ERROR: Failed to decode packet! Exception: " + e.getClass().getSimpleName() + ": " + e.getMessage());
