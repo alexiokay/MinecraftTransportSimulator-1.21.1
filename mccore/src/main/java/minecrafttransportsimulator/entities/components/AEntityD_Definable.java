@@ -19,6 +19,7 @@ import minecrafttransportsimulator.baseclasses.AnimationSwitchbox;
 import minecrafttransportsimulator.baseclasses.ColorRGB;
 import minecrafttransportsimulator.baseclasses.ComputedVariable;
 import minecrafttransportsimulator.baseclasses.Point3D;
+import minecrafttransportsimulator.baseclasses.RotationMatrix;
 import minecrafttransportsimulator.baseclasses.TransformationMatrix;
 import minecrafttransportsimulator.blocks.components.ABlockBase.BlockMaterial;
 import minecrafttransportsimulator.entities.instances.APart;
@@ -561,7 +562,9 @@ public abstract class AEntityD_Definable<JSONDefinition extends AJSONMultiModelP
                 AnimationSwitchbox spawningSwitchbox = particleSpawningSwitchboxes.get(particleDef);
                 if (particleDef.distance > 0) {
                     //First get spawning position as defined by JSON and animations.
-                    EntityParticle.setPointToSpawn(position, orientation, particleDef.pos, scale, spawningSwitchbox, particleSpawningPosition);
+                    //Only apply orientation if the spawning orientation isn't WORLD, as WORLD particles should ignore entity orientation.
+                    RotationMatrix particleOrientation = particleDef.spawningOrientation == JSONParticle.ParticleSpawningOrientation.WORLD ? null : orientation;
+                    EntityParticle.setPointToSpawn(position, particleOrientation, particleDef.pos, scale, spawningSwitchbox, particleSpawningPosition);
 
                     //Now check if we need to spawn.
                     Point3D lastParticlePosition = lastPositionParticleSpawned.get(particleDef);

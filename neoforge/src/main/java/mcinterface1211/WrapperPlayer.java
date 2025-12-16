@@ -24,18 +24,92 @@ import net.minecraft.world.inventory.CraftingMenu;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.phys.AABB;
 import net.neoforged.neoforge.event.level.LevelEvent;
+import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
+import net.neoforged.neoforge.common.util.TriState;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
+import minecrafttransportsimulator.baseclasses.BoundingBox;
+import minecrafttransportsimulator.baseclasses.Point3D;
+import minecrafttransportsimulator.entities.components.AEntityB_Existing;
+import minecrafttransportsimulator.entities.components.AEntityE_Interactable;
+import minecrafttransportsimulator.entities.instances.APart;
 
 /**
  * WrapperPlayer event handlers are registered via this separate inner class
  * to avoid inheritance issues with EventBusSubscriber.
  */
-@EventBusSubscriber
+@EventBusSubscriber(modid = "mts")
 class WrapperPlayerEvents {
     @SubscribeEvent
     public static void onIVWorldUnload(LevelEvent.Unload event) {
         WrapperPlayer.clearPlayerWrappers(event);
+    }
+
+    /**
+     * Prevent block placement when player is sitting in an MTS vehicle and clicking inside the vehicle's bounds.
+     * This stops the annoying behavior where right-clicking to interact with vehicle controls
+     * also places blocks if the player is holding a placeable item.
+     * Uses oriented bounding box: transforms click point to vehicle local space and checks
+     * against local dimensions calculated from collision box localCenters (rotation-independent).
+     */
+    @SubscribeEvent
+    public static void onPlayerRightClickBlock(PlayerInteractEvent.RightClickBlock event) {
+        Player player = event.getEntity();
+        if (player.getVehicle() instanceof BuilderEntityLinkedSeat seat) {
+            AEntityB_Existing mtsEntity = seat.entity;
+
+            //If the entity is a part (like a seat), get the master entity (the whole vehicle)
+            AEntityE_Interactable<?> vehicleEntity = null;
+            if (mtsEntity instanceof APart part) {
+                vehicleEntity = part.masterEntity;
+            } else if (mtsEntity instanceof AEntityE_Interactable<?> interactable) {
+                vehicleEntity = interactable;
+            }
+
+            if (vehicleEntity != null && !vehicleEntity.collisionBoxes.isEmpty()) {
+                //Get clicked block position (center of the block)
+                net.minecraft.core.BlockPos clickedPos = event.getPos();
+                Point3D clickPoint = new Point3D(clickedPos.getX() + 0.5, clickedPos.getY() + 0.5, clickedPos.getZ() + 0.5);
+
+                //Quick rejection: check axis-aligned encompassing box first
+                if (!vehicleEntity.encompassingBox.isPointInside(clickPoint, null)) {
+                    return; //Definitely outside, allow placement
+                }
+
+                //Transform click point to vehicle's local coordinate space
+                Point3D localClickPoint = clickPoint.copy().subtract(vehicleEntity.position);
+                localClickPoint.reOrigin(vehicleEntity.orientation);
+
+                //Calculate local encompassing box from collision boxes' LOCAL centers
+                //This gives us the unrotated vehicle dimensions (rotation-independent)
+                double maxW = 0, maxH = 0, maxD = 0;
+                for (BoundingBox box : vehicleEntity.collisionBoxes) {
+                    maxW = Math.max(maxW, Math.abs(box.localCenter.x) + box.widthRadius);
+                    maxH = Math.max(maxH, Math.abs(box.localCenter.y) + box.heightRadius);
+                    maxD = Math.max(maxD, Math.abs(box.localCenter.z) + box.depthRadius);
+                }
+
+                //Debug logging (only in dev mode)
+                if (minecrafttransportsimulator.systems.ConfigSystem.settings.general.devMode.value) {
+                    minecrafttransportsimulator.mcinterface.InterfaceManager.coreInterface.logError("Local click: " + localClickPoint + " bounds: W=" + maxW + " H=" + maxH + " D=" + maxD);
+                }
+
+                //Check if local click point is inside the local encompassing box
+                //Add 1.0 block padding to account for block size and vehicle movement during click
+                double padding = 1.0;
+                if (Math.abs(localClickPoint.x) <= maxW + padding &&
+                    Math.abs(localClickPoint.y) <= maxH + padding &&
+                    Math.abs(localClickPoint.z) <= maxD + padding) {
+                    //Click is inside vehicle bounds - block placement
+                    if (minecrafttransportsimulator.systems.ConfigSystem.settings.general.devMode.value) {
+                        minecrafttransportsimulator.mcinterface.InterfaceManager.coreInterface.logError("BLOCKED - inside bounds");
+                    }
+                    event.setUseItem(TriState.FALSE);
+                } else if (minecrafttransportsimulator.systems.ConfigSystem.settings.general.devMode.value) {
+                    minecrafttransportsimulator.mcinterface.InterfaceManager.coreInterface.logError("ALLOWED - outside bounds");
+                }
+            }
+        }
     }
 }
 

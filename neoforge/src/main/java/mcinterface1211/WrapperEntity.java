@@ -43,12 +43,10 @@ import net.minecraft.world.item.alchemy.Potion;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.event.level.LevelEvent;
 import net.neoforged.neoforge.event.entity.EntityTeleportEvent;
-import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
-import net.neoforged.neoforge.common.util.TriState;
 
-@EventBusSubscriber
+@EventBusSubscriber(modid = "mts")
 public class WrapperEntity implements IWrapperEntity {
     private static final Map<Entity, WrapperEntity> entityClientWrappers = new HashMap<>();
     private static final Map<Entity, WrapperEntity> entityServerWrappers = new HashMap<>();
@@ -520,20 +518,6 @@ public class WrapperEntity implements IWrapperEntity {
                     player.stopRiding();
                 }
             }
-        }
-    }
-
-    /**
-     * Prevent block placement when player is sitting in an MTS vehicle and clicking inside the vehicle's bounds.
-     * This stops the annoying behavior where right-clicking to interact with
-     * vehicle controls also places blocks if the player is holding a placeable item.
-     */
-    @SubscribeEvent
-    public static void onPlayerRightClickBlock(PlayerInteractEvent.RightClickBlock event) {
-        Player player = event.getEntity();
-        if (player.getVehicle() instanceof BuilderEntityLinkedSeat) {
-            //Player is in an MTS vehicle - block ALL item use to test if event is working
-            event.setUseItem(TriState.FALSE);
         }
     }
 }
