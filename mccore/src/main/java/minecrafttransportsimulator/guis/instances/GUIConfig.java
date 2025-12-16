@@ -35,12 +35,9 @@ public class GUIConfig extends AGUIBase {
     private boolean configuringRendering = false;
     private final Map<GUIComponentButton, JSONConfigEntry<Boolean>> renderConfigButtons = new HashMap<>();
     private final Map<GUIComponentButton, JSONConfigEntry<Boolean>> controlConfigButtons = new HashMap<>();
-    private final List<GUIComponentButton> renderConfigButtonList = new ArrayList<>();
-    private final List<GUIComponentLabel> renderConfigLabelList = new ArrayList<>();
-    private int renderConfigScrollOffset = 0;
-    private static final int RENDER_CONFIG_MAX_ROWS = 7;
-    private GUIComponentButton renderConfigScrollUpButton;
-    private GUIComponentButton renderConfigScrollDownButton;
+    private static final int CONFIG_MAX_ROWS = 7;
+    private final ScrollableConfigList renderConfigList = new ScrollableConfigList();
+    private final ScrollableConfigList controlConfigList = new ScrollableConfigList();
     private GUIComponentButton renderMode0Button;
     private GUIComponentButton renderMode1Button;
     private GUIComponentButton renderMode2Button;
@@ -126,7 +123,7 @@ public class GUIConfig extends AGUIBase {
                 scrollSpot = 0;
                 joystickComponentId = -1;
                 calibrating = false;
-                renderConfigScrollOffset = 0;
+                renderConfigList.resetScroll();
             }
         });
         addComponent(controlConfigScreenButton = new GUIComponentButton(this, guiLeft + 85, guiTop - 20, 85, 20, LanguageSystem.GUI_CONFIG_HEADER_CONFIG.getCurrentValue()) {
@@ -139,6 +136,7 @@ public class GUIConfig extends AGUIBase {
                 scrollSpot = 0;
                 joystickComponentId = -1;
                 calibrating = false;
+                controlConfigList.resetScroll();
             }
         });
         addComponent(controlScreenButton = new GUIComponentButton(this, guiLeft + 171, guiTop - 20, 85, 20, LanguageSystem.GUI_CONFIG_HEADER_CONTROLS.getCurrentValue()) {
@@ -150,10 +148,10 @@ public class GUIConfig extends AGUIBase {
 
         //Config buttons and text.
         //We have two sets here.  One for rendering, one for controls.
-        renderConfigButtonList.clear();
-        renderConfigLabelList.clear();
-        populateConfigButtonList(renderConfigButtons, renderConfigButtonList, renderConfigLabelList, ConfigSystem.client.renderingSettings);
-        populateConfigButtonList(controlConfigButtons, null, null, ConfigSystem.client.controlSettings);
+        renderConfigList.clear();
+        controlConfigList.clear();
+        populateConfigButtonList(renderConfigButtons, renderConfigList, ConfigSystem.client.renderingSettings);
+        populateConfigButtonList(controlConfigButtons, controlConfigList, ConfigSystem.client.controlSettings);
 
         //Add render mode components.
         addComponent(renderMode0Button = new GUIComponentButton(this, guiLeft + 20, guiTop + 160, 70, 20, LanguageSystem.GUI_CONFIG_RENDERING_MODE0.getCurrentValue()) {
@@ -180,16 +178,30 @@ public class GUIConfig extends AGUIBase {
         addComponent(new GUIComponentLabel(guiLeft + 10, guiTop + 140, ColorRGB.BLACK, LanguageSystem.GUI_CONFIG_RENDERING_LABEL.getCurrentValue(), TextAlignment.LEFT_ALIGNED, 0.75F, getWidth() - 20).setComponent(renderMode1Button));
 
         //Scroll buttons for render config - above first row and below last row on right edge
-        addComponent(renderConfigScrollUpButton = new GUIComponentButton(this, guiLeft + getWidth() - 20, guiTop + 2, 16, 16, "/\\") {
+        addComponent(renderConfigList.scrollUpButton = new GUIComponentButton(this, guiLeft + getWidth() - 20, guiTop + 2, 16, 16, "/\\") {
             @Override
             public void onClicked(boolean leftSide) {
-                renderConfigScrollOffset -= 1;
+                renderConfigList.scrollOffset -= 1;
             }
         });
-        addComponent(renderConfigScrollDownButton = new GUIComponentButton(this, guiLeft + getWidth() - 20, guiTop + 20 + 16 * RENDER_CONFIG_MAX_ROWS, 16, 16, "\\/") {
+        addComponent(renderConfigList.scrollDownButton = new GUIComponentButton(this, guiLeft + getWidth() - 20, guiTop + 20 + 16 * CONFIG_MAX_ROWS, 16, 16, "\\/") {
             @Override
             public void onClicked(boolean leftSide) {
-                renderConfigScrollOffset += 1;
+                renderConfigList.scrollOffset += 1;
+            }
+        });
+
+        //Scroll buttons for control config - same positions as render config
+        addComponent(controlConfigList.scrollUpButton = new GUIComponentButton(this, guiLeft + getWidth() - 20, guiTop + 2, 16, 16, "/\\") {
+            @Override
+            public void onClicked(boolean leftSide) {
+                controlConfigList.scrollOffset -= 1;
+            }
+        });
+        addComponent(controlConfigList.scrollDownButton = new GUIComponentButton(this, guiLeft + getWidth() - 20, guiTop + 20 + 16 * CONFIG_MAX_ROWS, 16, 16, "\\/") {
+            @Override
+            public void onClicked(boolean leftSide) {
+                controlConfigList.scrollOffset += 1;
             }
         });
 
@@ -513,49 +525,8 @@ public class GUIConfig extends AGUIBase {
         controlScreenButton.enabled = !configuringControls;
 
         //If we are not configuring controls, render the appropriate config buttons and labels.
-        //Apply scroll offset for render config buttons.
-        int totalRenderRows = (renderConfigButtonList.size() + 1) / 2;
-        int maxScrollOffset = Math.max(0, totalRenderRows - RENDER_CONFIG_MAX_ROWS);
-
-        //Handle mouse wheel scrolling for render config when on that screen
-        if (!renderConfigScreenButton.enabled && maxScrollOffset > 0) {
-            int wheelMovement = InterfaceManager.inputInterface.getTrackedMouseWheel();
-            if (wheelMovement > 0 && renderConfigScrollOffset > 0) {
-                renderConfigScrollOffset -= 1;
-            } else if (wheelMovement < 0 && renderConfigScrollOffset < maxScrollOffset) {
-                renderConfigScrollOffset += 1;
-            }
-        }
-
-        renderConfigScrollOffset = Math.max(0, Math.min(renderConfigScrollOffset, maxScrollOffset));
-
-        for (int i = 0; i < renderConfigButtonList.size(); i++) {
-            GUIComponentButton button = renderConfigButtonList.get(i);
-            int buttonRow = i / 2;
-            int visibleRow = buttonRow - renderConfigScrollOffset;
-            boolean inVisibleRange = visibleRow >= 0 && visibleRow < RENDER_CONFIG_MAX_ROWS;
-            button.visible = !renderConfigScreenButton.enabled && inVisibleRange;
-
-            //Update button and label positions based on scroll (always update, not just when visible)
-            int newY = guiTop + 20 + 16 * visibleRow;
-            //Update button position (note: position.y is negated for OpenGL coords)
-            button.position.y = -newY;
-            //Update button text position (centered vertically in button)
-            button.textPosition.y = -newY - (button.height - 8) / 2;
-
-            //Update corresponding label
-            if (i < renderConfigLabelList.size()) {
-                GUIComponentLabel label = renderConfigLabelList.get(i);
-                label.visible = button.visible;
-                label.textPosition.y = -(newY + 5);
-            }
-        }
-
-        //Scroll buttons for render config
-        renderConfigScrollUpButton.visible = !renderConfigScreenButton.enabled && maxScrollOffset > 0;
-        renderConfigScrollUpButton.enabled = renderConfigScrollOffset > 0;
-        renderConfigScrollDownButton.visible = !renderConfigScreenButton.enabled && maxScrollOffset > 0;
-        renderConfigScrollDownButton.enabled = renderConfigScrollOffset < maxScrollOffset;
+        updateScrollableConfigList(renderConfigList, !renderConfigScreenButton.enabled);
+        updateScrollableConfigList(controlConfigList, !controlConfigScreenButton.enabled);
 
         renderMode0Button.visible = !renderConfigScreenButton.enabled;
         renderMode0Button.enabled = ConfigSystem.client.renderingSettings.renderingMode.value != 0;
@@ -563,10 +534,6 @@ public class GUIConfig extends AGUIBase {
         renderMode1Button.enabled = ConfigSystem.client.renderingSettings.renderingMode.value != 1;
         renderMode2Button.visible = !renderConfigScreenButton.enabled;
         renderMode2Button.enabled = ConfigSystem.client.renderingSettings.renderingMode.value != 2;
-
-        for (GUIComponentButton button : controlConfigButtons.keySet()) {
-            button.visible = !controlConfigScreenButton.enabled;
-        }
 
         //If we are configuring controls, and haven't selected a vehicle, render the vehicle selection components.
         controlSelectionFaultLabel.visible = !InterfaceManager.inputInterface.isJoystickSupportEnabled() && configuringControls && !configuringKeyboard;
@@ -743,7 +710,7 @@ public class GUIConfig extends AGUIBase {
     }
 
     @SuppressWarnings("unchecked")
-    private void populateConfigButtonList(Map<GUIComponentButton, JSONConfigEntry<Boolean>> configButtons, List<GUIComponentButton> buttonList, List<GUIComponentLabel> labelList, Object configObject) {
+    private void populateConfigButtonList(Map<GUIComponentButton, JSONConfigEntry<Boolean>> configButtons, ScrollableConfigList list, Object configObject) {
         configButtons.clear();
         int buttonIndex = 0;
         for (Field field : configObject.getClass().getFields()) {
@@ -768,18 +735,10 @@ public class GUIConfig extends AGUIBase {
                         };
                         addComponent(button);
                         configButtons.put(button, (JSONConfigEntry<Boolean>) configEntry);
-                        if (buttonList != null) {
-                            buttonList.add(button);
-                        }
+                        list.buttons.add(button);
                         GUIComponentLabel label = new GUIComponentLabel(button.constructedX - 75, button.constructedY + 5, ColorRGB.BLACK, field.getName());
-                        //Don't use setComponent for scrollable labels - we control visibility manually
-                        if (labelList == null) {
-                            label.setComponent(button);
-                        }
                         addComponent(label);
-                        if (labelList != null) {
-                            labelList.add(label);
-                        }
+                        list.labels.add(label);
                         buttonIndex++;
                     }
                 } catch (Exception e) {
@@ -787,6 +746,52 @@ public class GUIConfig extends AGUIBase {
                 }
             }
         }
+    }
+
+    /**
+     * Updates scroll state and visibility for a scrollable config list.
+     * Handles mouse wheel input, button/label positioning, and scroll button states.
+     */
+    private void updateScrollableConfigList(ScrollableConfigList list, boolean isActive) {
+        int totalRows = (list.buttons.size() + 1) / 2;
+        int maxScrollOffset = Math.max(0, totalRows - CONFIG_MAX_ROWS);
+
+        //Handle mouse wheel scrolling when this screen is active
+        if (isActive && maxScrollOffset > 0) {
+            int wheelMovement = InterfaceManager.inputInterface.getTrackedMouseWheel();
+            if (wheelMovement > 0 && list.scrollOffset > 0) {
+                list.scrollOffset -= 1;
+            } else if (wheelMovement < 0 && list.scrollOffset < maxScrollOffset) {
+                list.scrollOffset += 1;
+            }
+        }
+
+        list.scrollOffset = Math.max(0, Math.min(list.scrollOffset, maxScrollOffset));
+
+        //Update button and label visibility/positions
+        for (int i = 0; i < list.buttons.size(); i++) {
+            GUIComponentButton button = list.buttons.get(i);
+            int buttonRow = i / 2;
+            int visibleRow = buttonRow - list.scrollOffset;
+            boolean inVisibleRange = visibleRow >= 0 && visibleRow < CONFIG_MAX_ROWS;
+            button.visible = isActive && inVisibleRange;
+
+            int newY = guiTop + 20 + 16 * visibleRow;
+            button.position.y = -newY;
+            button.textPosition.y = -newY - (button.height - 8) / 2;
+
+            if (i < list.labels.size()) {
+                GUIComponentLabel label = list.labels.get(i);
+                label.visible = button.visible;
+                label.textPosition.y = -(newY + 5);
+            }
+        }
+
+        //Update scroll button states
+        list.scrollUpButton.visible = isActive && maxScrollOffset > 0;
+        list.scrollUpButton.enabled = list.scrollOffset > 0;
+        list.scrollDownButton.visible = isActive && maxScrollOffset > 0;
+        list.scrollDownButton.enabled = list.scrollOffset < maxScrollOffset;
     }
 
     private static enum ControlTypeEnum {
@@ -800,6 +805,26 @@ public class GUIConfig extends AGUIBase {
         private ControlTypeEnum(LanguageEntry keyboardEntry, LanguageEntry joystickEntry) {
             this.keyboardLanguage = keyboardEntry;
             this.joystickLanguage = joystickEntry;
+        }
+    }
+
+    /**
+     * Helper class to hold scroll state for a config list.
+     */
+    private static class ScrollableConfigList {
+        final List<GUIComponentButton> buttons = new ArrayList<>();
+        final List<GUIComponentLabel> labels = new ArrayList<>();
+        int scrollOffset = 0;
+        GUIComponentButton scrollUpButton;
+        GUIComponentButton scrollDownButton;
+
+        void clear() {
+            buttons.clear();
+            labels.clear();
+        }
+
+        void resetScroll() {
+            scrollOffset = 0;
         }
     }
 }
