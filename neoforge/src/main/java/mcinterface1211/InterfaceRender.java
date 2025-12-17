@@ -100,6 +100,8 @@ public class InterfaceRender implements IInterfaceRender {
     public static MultiBufferSource renderBuffer;
     public static Point3D renderCameraOffset = new Point3D();
     private static boolean renderingGUI;
+    //Reusable Vector3f to avoid allocating a new one per-vertex during rendering
+    private static final org.joml.Vector3f tempNormalVec = new org.joml.Vector3f();
 
     private static ShaderInstance entityLightsShader;
     private static ShaderInstance entityCutoutNoshadowsShader;
@@ -440,9 +442,9 @@ public class InterfaceRender implements IInterfaceRender {
                     // Use full bright for entities that should ignore lighting (particles, lights, etc)
                     int lightValue = data.lightingMode.disableWorldLighting ? LightTexture.FULL_BRIGHT : data.worldLightValue;
                     buffer.setLight(lightValue);
-                    // Transform normal vector using the normal matrix
-                    org.joml.Vector3f normalVec = new org.joml.Vector3f(normalX, normalY, normalZ).mul(stackEntry.normal());
-                    buffer.setNormal(normalVec.x, normalVec.y, normalVec.z);
+                    // Transform normal vector using the normal matrix (reuse static Vector3f to avoid allocation)
+                    tempNormalVec.set(normalX, normalY, normalZ).mul(stackEntry.normal());
+                    buffer.setNormal(tempNormalVec.x, tempNormalVec.y, tempNormalVec.z);
                     // endVertex() is no longer needed in MC 1.21.1 - called automatically
                 }
                 //Rewind buffer for next read.
@@ -840,12 +842,11 @@ public class InterfaceRender implements IInterfaceRender {
      * Renders the main GUI, setting up any transforms or operations as required.
      */
     protected static void renderGUI(GuiGraphics mcGUI, int mouseX, int mouseY, int screenWidth, int screenHeight, float partialTicks, boolean updateGUIs) {
-        //Get the buffer for GUI rendering.
+        //Get the buffer for GUI rendering - use GuiGraphics' built-in buffer to avoid memory leaks.
         matrixStack = mcGUI.pose();
         matrixStack.pushPose();
         renderingGUI = true;
-        ByteBufferBuilder byteBufferBuilder = new ByteBufferBuilder(256);
-        MultiBufferSource.BufferSource guiBuffer = MultiBufferSource.immediate(byteBufferBuilder);
+        MultiBufferSource.BufferSource guiBuffer = mcGUI.bufferSource();
         renderBuffer = guiBuffer;
 
         //Render GUIs, re-creating their components if needed.
@@ -935,8 +936,7 @@ public class InterfaceRender implements IInterfaceRender {
         matrixStack = mcGUI.pose();
         matrixStack.pushPose();
         renderingGUI = true;
-        ByteBufferBuilder byteBufferBuilder = new ByteBufferBuilder(256);
-        MultiBufferSource.BufferSource guiBuffer = MultiBufferSource.immediate(byteBufferBuilder);
+        MultiBufferSource.BufferSource guiBuffer = mcGUI.bufferSource();
         renderBuffer = guiBuffer;
 
         // Set Y-axis to inverted to have correct orientation

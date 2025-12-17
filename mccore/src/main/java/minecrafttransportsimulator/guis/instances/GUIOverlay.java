@@ -72,26 +72,39 @@ public class GUIOverlay extends AGUIBase {
         IWrapperPlayer player = InterfaceManager.clientInterface.getClientPlayer();
 
         //Set gun label text, if we are controlling a gun.
+        //Modern weapon HUD is rendered via WeaponHUDOverlay (NeoForge native overlay)
+        //Legacy text only shows for guns without gunHUD defined
         gunLabel.visible = false;
         if (!InterfaceManager.clientInterface.isChatOpen()) {
             EntityPlayerGun playerGun = EntityPlayerGun.playerClientGuns.get(player.getID());
             if (playerGun != null && playerGun.activeGun != null) {
-                gunLabel.visible = true;
-                gunLabel.text = "Gun:" + playerGun.activeGun.cachedItem.getItemName() + " Loaded:" + playerGun.activeGun.getBulletText();
+                // Only show legacy text if gun doesn't have modern HUD (gunHUD) defined
+                // Modern HUD is rendered via WeaponHUDOverlay (NeoForge native overlay)
+                if (playerGun.activeGun.definition.gunHUD == null || !playerGun.activeGun.definition.gunHUD.enabled) {
+                    gunLabel.visible = true;
+                    gunLabel.text = "Gun:" + playerGun.activeGun.cachedItem.getItemName() + " Loaded:" + playerGun.activeGun.getBulletText();
+                }
             } else {
                 AEntityB_Existing entityRiding = player.getEntityRiding();
                 if (entityRiding instanceof PartSeat) {
                     PartSeat seat = (PartSeat) entityRiding;
                     if (seat.canControlGuns) {
-                        gunLabel.visible = true;
-                        gunLabel.text = "Active Gun:";
-                        if (seat.activeGunItem != null) {
-                            gunLabel.text += seat.activeGunItem.getItemName();
-                            if (seat.activeGunItem.definition.gun.fireSolo) {
-                                gunLabel.text += " [" + (seat.gunIndex + 1) + "]";
+                        // Check if active gun has modern HUD - if so, WeaponHUDOverlay handles it
+                        boolean hasModernHUD = seat.activeGunItem != null &&
+                            seat.activeGunItem.definition.gunHUD != null &&
+                            seat.activeGunItem.definition.gunHUD.enabled;
+
+                        if (!hasModernHUD) {
+                            gunLabel.visible = true;
+                            gunLabel.text = "Active Gun:";
+                            if (seat.activeGunItem != null) {
+                                gunLabel.text += seat.activeGunItem.getItemName();
+                                if (seat.activeGunItem.definition.gun.fireSolo) {
+                                    gunLabel.text += " [" + (seat.gunIndex + 1) + "]";
+                                }
+                            } else {
+                                gunLabel.text += "None";
                             }
-                        } else {
-                            gunLabel.text += "None";
                         }
                     }
                 }

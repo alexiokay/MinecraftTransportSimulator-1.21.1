@@ -111,6 +111,11 @@ public class InterfaceEventsModelLoader {
                 shouldProcess = true;
             }
 
+            // Also handle MTS namespace PNG texture requests (for core MTS textures like overlay/ammo_bar)
+            if (!shouldProcess && location.getNamespace().equals(InterfaceLoader.MODID) && location.getPath().endsWith(".png")) {
+                shouldProcess = true;
+            }
+
             if (shouldProcess) {
                 String path = location.getPath();
 
@@ -118,7 +123,13 @@ public class InterfaceEventsModelLoader {
                 if (path.endsWith(".png")) {
                     //Create stream return variable and get raw data.
                     InputStream stream;
-                    String domain = !location.getNamespace().equals(InterfaceLoader.MODID) ? location.getNamespace() : getPackID(location.getPath());
+                    // For MTS namespace, use "mts" as domain directly; for others, use the namespace or extract from path
+                    String domain;
+                    if (location.getNamespace().equals(InterfaceLoader.MODID)) {
+                        domain = InterfaceLoader.MODID;
+                    } else {
+                        domain = !location.getNamespace().equals(InterfaceLoader.MODID) ? location.getNamespace() : getPackID(location.getPath());
+                    }
                     String rawPackInfo = location.getPath();
                     String streamLocation = "/assets/" + domain + "/" + rawPackInfo;
                     stream = InterfaceManager.coreInterface.getPackResource(streamLocation);

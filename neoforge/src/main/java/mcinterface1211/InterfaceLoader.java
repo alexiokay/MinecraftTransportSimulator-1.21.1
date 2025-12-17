@@ -139,6 +139,9 @@ public class InterfaceLoader {
             modEventBus.addListener(InterfaceRender::onIVRegisterShadersEvent);
             modEventBus.addListener(InterfaceRender::onIVRegisterRenderersEvent);
 
+            // Register weapon HUD GUI layer (like Superb Warfare does)
+            modEventBus.addListener(ClientRenderingEvents::onRegisterGuiLayers);
+
             //Initialize texture states early to prevent render delays
             InterfaceRender.initializeTextureStates();
         } else {
