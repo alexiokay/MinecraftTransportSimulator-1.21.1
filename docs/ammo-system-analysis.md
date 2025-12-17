@@ -352,9 +352,46 @@ Arrow Up/Down cycles through:
 3. Vehicle ammo storage connection
 
 ### Phase 4: Fire Mode Switching
-1. Add switchable fire modes to gun JSON
-2. Add keybind for fire mode toggle
-3. Update HUD fire mode display
+
+**Current State (PARTIALLY IMPLEMENTED):**
+- ✅ `fireModes` array added to `JSONPart.java` - defines available modes
+- ✅ `defaultFireMode` added to `JSONPart.java` - starting mode
+- ✅ `burstCount` added to `JSONPart.java` - shots per burst
+- ✅ `WeaponHUDOverlay.java` displays correct icon based on fire mode
+- ✅ Backward compatibility with legacy `isSemiAuto` boolean
+- ❌ Runtime switching NOT yet implemented (pressing N does nothing)
+- ❌ `currentFireModeIndex` NOT yet in PartGun
+- ❌ Packet for syncing fire mode changes NOT yet created
+
+**Available Fire Modes:**
+| Mode | Value | Icon | Behavior |
+|------|-------|------|----------|
+| Semi-Automatic | `"semi"` | `semi.png` | One shot per click |
+| Automatic | `"auto"` | `auto.png` | Continuous fire while holding |
+| Burst | `"burst"` | `burst.png` | Fire `burstCount` shots per click |
+
+**JSON Schema (NOW IMPLEMENTED):**
+```json
+{
+  "gun": {
+    "fireModes": ["semi", "auto", "burst"],  // Available modes - NOW SUPPORTED
+    "defaultFireMode": "auto",                // Starting mode - NOW SUPPORTED
+    "burstCount": 3,                          // Shots per burst - NOW SUPPORTED
+    "isSemiAuto": true                        // DEPRECATED - still works for backward compat
+  }
+}
+```
+
+**Priority Order for Fire Mode Display:**
+1. If `fireModes` is defined → use `defaultFireMode` (or first in list)
+2. Else if `isSemiAuto: true` → display semi icon
+3. Else → display auto icon (default)
+
+**Still Needed for Runtime Switching:**
+- `PartGun.java`: Add `currentFireModeIndex`, `cycleFireMode()`, save/load from NBT
+- `PacketPartGun.java`: Add `FIRE_MODE_CHANGE` request type
+- `InterfaceInput.java`: Add keybind handler for `N` key
+- `PartGun.java`: Modify firing logic to respect current fire mode
 
 ---
 

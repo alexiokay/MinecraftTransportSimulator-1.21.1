@@ -335,22 +335,55 @@ public class WeaponHUDOverlay {
         }
 
         // === FIRE MODE SECTION ===
+        // Supports 3 fire modes: semi, auto, burst
+        // With backward compatibility for legacy isSemiAuto boolean
+        // TODO: Implement runtime fire mode switching - see docs/ammo-system-analysis.md Phase 4
+
         // Render keybind [N] at EXACT Superb Warfare position: x - 111.5f, y - 20
-        // Superb Warfare uses float x position and no shadow (false)
         guiGraphics.drawString(font, "[N]", x - 111.5f, (float)(y - 20), 0xFFFFFF, false);
 
         // Determine fire mode from gun definition
-        // isSemiAuto = true means semi-automatic (one shot per click)
-        // isSemiAuto = false (or not set) means automatic (hold to fire continuously)
-        boolean isSemiAuto = false;
+        // Priority: fireModes list > defaultFireMode > isSemiAuto (legacy) > auto (default)
+        String currentFireMode = "auto";  // Default to automatic
+
+        // Get the gun definition to check fire modes
+        minecrafttransportsimulator.jsondefs.JSONPart.JSONPartGun gunDef = null;
         if (gun != null && gun.definition.gun != null) {
-            isSemiAuto = gun.definition.gun.isSemiAuto;
+            gunDef = gun.definition.gun;
         } else if (heldGunItem != null && heldGunItem.definition.gun != null) {
-            isSemiAuto = heldGunItem.definition.gun.isSemiAuto;
+            gunDef = heldGunItem.definition.gun;
         }
 
-        // Select fire mode texture based on isSemiAuto flag
-        ResourceLocation fireModeTexture = isSemiAuto ? TEXTURE_SEMI : TEXTURE_AUTO;
+        if (gunDef != null) {
+            // Check for new fireModes list first
+            if (gunDef.fireModes != null && !gunDef.fireModes.isEmpty()) {
+                // Use defaultFireMode if specified, otherwise first mode in list
+                if (gunDef.defaultFireMode != null && gunDef.fireModes.contains(gunDef.defaultFireMode)) {
+                    currentFireMode = gunDef.defaultFireMode;
+                } else {
+                    currentFireMode = gunDef.fireModes.get(0);
+                }
+                // TODO: When runtime switching is implemented, read currentFireModeIndex from PartGun
+            } else {
+                // Backward compatibility: use legacy isSemiAuto boolean
+                currentFireMode = gunDef.isSemiAuto ? "semi" : "auto";
+            }
+        }
+
+        // Select fire mode texture based on current mode
+        ResourceLocation fireModeTexture;
+        switch (currentFireMode.toLowerCase()) {
+            case "semi":
+                fireModeTexture = TEXTURE_SEMI;
+                break;
+            case "burst":
+                fireModeTexture = TEXTURE_BURST;
+                break;
+            case "auto":
+            default:
+                fireModeTexture = TEXTURE_AUTO;
+                break;
+        }
 
         // Render fire mode icon using preciseBlit for exact Superb Warfare match
         // Superb Warfare: guiGraphics.blit(fireMode, x - 95, y - 21, 0f, 0f, 8, 8, 8, 8)

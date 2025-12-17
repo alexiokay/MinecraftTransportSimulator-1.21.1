@@ -409,8 +409,17 @@ public class JSONPart extends AJSONPartProvider {
         @JSONDescription("If true, then this gun will force the custom camera when hand-held.  Useful for custom HUDs.  Does not affect third-person mode.")
         public boolean forceHandheldCameras;
 
-        @JSONDescription("If set, the gun will only be able to be fired once per button press.")
+        @JSONDescription("If set, the gun will only be able to be fired once per button press. DEPRECATED: Use fireModes instead for switchable fire modes.")
         public boolean isSemiAuto;
+
+        @JSONDescription("A list of available fire modes for this gun. Valid values are: 'semi', 'auto', 'burst'. If not specified, falls back to isSemiAuto for backward compatibility. Example: [\"semi\", \"auto\"] allows switching between semi-automatic and automatic fire.")
+        public java.util.List<String> fireModes;
+
+        @JSONDescription("The default fire mode when the gun is first equipped. Must be one of the values in fireModes. If not specified, defaults to the first mode in fireModes, or uses isSemiAuto for backward compatibility.")
+        public String defaultFireMode;
+
+        @JSONDescription("How many shots to fire per trigger pull when in burst mode. Only used if 'burst' is in fireModes. Defaults to 3 if not specified.")
+        public int burstCount;
 
         @JSONDescription("If true, this makes it so that only one of this type of gun can be selected and fired at a time. This is useful for missiles and bombs that have different types of ammunition, as you can load different guns with different types of ammunition, and switch between the individual guns. If not used or set to false, cycling through weapons will select all weapons of the same type.")
         public boolean fireSolo;
