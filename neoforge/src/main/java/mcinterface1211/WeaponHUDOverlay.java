@@ -338,11 +338,24 @@ public class WeaponHUDOverlay {
         // Superb Warfare uses float x position and no shadow (false)
         guiGraphics.drawString(font, "[N]", x - 111.5f, (float)(y - 20), 0xFFFFFF, false);
 
+        // Determine fire mode from gun definition
+        // isSemiAuto = true means semi-automatic (one shot per click)
+        // isSemiAuto = false (or not set) means automatic (hold to fire continuously)
+        boolean isSemiAuto = false;
+        if (gun != null && gun.definition.gun != null) {
+            isSemiAuto = gun.definition.gun.isSemiAuto;
+        } else if (heldGunItem != null && heldGunItem.definition.gun != null) {
+            isSemiAuto = heldGunItem.definition.gun.isSemiAuto;
+        }
+
+        // Select fire mode texture based on isSemiAuto flag
+        ResourceLocation fireModeTexture = isSemiAuto ? TEXTURE_SEMI : TEXTURE_AUTO;
+
         // Render fire mode icon using preciseBlit for exact Superb Warfare match
         // Superb Warfare: guiGraphics.blit(fireMode, x - 95, y - 21, 0f, 0f, 8, 8, 8, 8)
         preciseBlit(
             guiGraphics,
-            TEXTURE_SEMI,
+            fireModeTexture,
             x - 95f,
             y - 21f,
             0f, 0f,    // UV offset
