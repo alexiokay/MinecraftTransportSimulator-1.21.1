@@ -234,11 +234,12 @@ public class WeaponHUDOverlay {
         // Superb Warfare: poseStack.scale(1.5f), then drawString at (x / 1.5f - 64 / 1.5f, gunAmmoY / 1.5f)
         // Superb Warfare gunAmmoY = y + 5 - 48 = y - 43
         String ammoString = String.valueOf(ammoCount);
-        int gunAmmoY = y + 5 - 48;  // y - 43, exactly like Superb Warfare
+        float gunAmmoY = y + 5 - 48;  // y - 43, exactly like Superb Warfare
 
         poseStack.pushPose();
         poseStack.scale(1.5f, 1.5f, 1f);
-        guiGraphics.drawString(font, ammoString, (int)(x / 1.5f - 64 / 1.5f), (int)(gunAmmoY / 1.5f), 0xFFFFFF, true);
+        // Use float coordinates like Superb Warfare (no int cast)
+        guiGraphics.drawString(font, ammoString, x / 1.5f - 64 / 1.5f, gunAmmoY / 1.5f, 0xFFFFFF, true);
         poseStack.popPose();
 
         // === BACKUP/RESERVE AMMO (normal scale, gray with shadow) ===
@@ -255,13 +256,13 @@ public class WeaponHUDOverlay {
         // Superb Warfare formula: x / 0.9f - (100 + font.width(gunName) / 2f) / 0.9f
         float gunNameX = x / 0.9f - (100 + font.width(gunName) / 2f) / 0.9f;
         float gunNameY = y / 0.9f - 60 / 0.9f;
-        guiGraphics.drawString(font, gunName, (int)gunNameX, (int)gunNameY, 0xFFFFFF, true);
+        guiGraphics.drawString(font, gunName, gunNameX, gunNameY, 0xFFFFFF, true);
 
         // Ammo type name: centered around x-100, y-51, tan color 0xC8A679
         if (!ammoName.isEmpty()) {
             float ammoNameX = x / 0.9f - (100 + font.width(ammoName) / 2f) / 0.9f;
             float ammoNameY = y / 0.9f - 51 / 0.9f;
-            guiGraphics.drawString(font, ammoName, (int)ammoNameX, (int)ammoNameY, 0xC8A679, true);
+            guiGraphics.drawString(font, ammoName, ammoNameX, ammoNameY, 0xC8A679, true);
         }
 
         poseStack.popPose();
