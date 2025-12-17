@@ -34,12 +34,22 @@ public class PacketPartGun extends APacketEntity<PartGun> {
         this.bulletQty = bulletQty;
     }
 
+    public PacketPartGun(PartGun gun, Request stateRequest, ItemBullet lastBullet) {
+        super(gun);
+        this.stateRequest = stateRequest;
+        this.bulletItem = lastBullet;
+        this.bulletQty = 0;
+    }
+
     public PacketPartGun(ByteBuf buf) {
         super(buf);
         this.stateRequest = Request.values()[buf.readByte()];
         if (stateRequest == Request.RELOAD_ONCLIENT) {
             this.bulletItem = readItemFromBuffer(buf);
             this.bulletQty = buf.readInt();
+        } else if (stateRequest == Request.BULLETS_OUT) {
+            this.bulletItem = readItemFromBuffer(buf);
+            this.bulletQty = 0;
         } else {
             this.bulletItem = null;
             this.bulletQty = 0;
@@ -53,6 +63,8 @@ public class PacketPartGun extends APacketEntity<PartGun> {
         if (stateRequest == Request.RELOAD_ONCLIENT) {
             writeItemToBuffer(bulletItem, buf);
             buf.writeInt(bulletQty);
+        } else if (stateRequest == Request.BULLETS_OUT) {
+            writeItemToBuffer(bulletItem, buf);
         }
     }
 
@@ -90,6 +102,9 @@ public class PacketPartGun extends APacketEntity<PartGun> {
             }
             case BULLETS_OUT: {
                 gun.bulletsPresentOnServer = false;
+                if (bulletItem != null) {
+                    gun.lastLoadedBullet = bulletItem;
+                }
                 break;
             }
             case BULLETS_PRESENT: {

@@ -112,6 +112,9 @@ public class JSONBullet extends AJSONMultiModelProvider {
 
         @JSONDescription("A optional list of code-defined functions to be called if the bullet types include custom.")
         public List<String> customHitFunctions;
+
+        @JSONDescription("Optional texture path for the HUD icon. If not specified, the item's inventory texture is used. Format: 'packid:path/to/texture' (without .png extension). Example: 'mtsofficialpack:textures/hud/foam_icon'")
+        public String hudIcon;
     }
 
     public enum BulletType {

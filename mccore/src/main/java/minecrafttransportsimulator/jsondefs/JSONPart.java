@@ -38,6 +38,9 @@ public class JSONPart extends AJSONPartProvider {
     @JSONDescription("Properties for guns.")
     public JSONPartGun gun;
 
+    @JSONDescription("Optional modern HUD overlay for guns. If not defined, the legacy text display is used. Only applies to gun parts.")
+    public JSONGunHUD gunHUD;
+
     @JSONRequired(dependentField = "type", dependentValues = {"interactable"}, subField = "generic")
     @JSONDescription("Properties for interactables.")
     public JSONPartInteractable interactable;

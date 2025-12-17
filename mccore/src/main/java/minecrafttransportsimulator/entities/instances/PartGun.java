@@ -249,6 +249,12 @@ public class PartGun extends APart {
                 if (world.isClient()) {
                     bulletsPresentOnServer = true;
                 }
+            } else if (data.hasKey("lastLoadedBullet")) {
+                // Restore lastLoadedBullet even when gun is empty (for HUD display)
+                IWrapperNBT lastBulletData = data.getData("lastLoadedBullet");
+                if (lastBulletData != null) {
+                    lastLoadedBullet = lastBulletData.getPackItem();
+                }
             }
             if (data.getBoolean("savedSeed")) {
                 long randomSeed = (((long) data.getInteger("randomSeedPart1")) << 32) | (data.getInteger("randomSeedPart2") & 0xffffffffL);
@@ -531,7 +537,7 @@ public class PartGun extends APart {
                                             lastLoadedBullet = loadedBullets.get(0);
                                         } else {
                                             if (!world.isClient()) {
-                                                InterfaceManager.packetInterface.sendToAllClients(new PacketPartGun(this, PacketPartGun.Request.BULLETS_OUT));
+                                                InterfaceManager.packetInterface.sendToAllClients(new PacketPartGun(this, PacketPartGun.Request.BULLETS_OUT, lastLoadedBullet));
                                             }
                                             break;
                                         }
@@ -1473,6 +1479,12 @@ public class PartGun extends APart {
             data.setData("loadedBullet" + i, bulletData);
         }
         data.setInteger("loadedBulletsSize", loadedBullets.size());
+        // Save lastLoadedBullet even when gun is empty (for HUD display to show last ammo type)
+        if (lastLoadedBullet != null) {
+            IWrapperNBT lastBulletData = InterfaceManager.coreInterface.getNewNBTWrapper();
+            lastBulletData.setPackItem(lastLoadedBullet.definition, "");
+            data.setData("lastLoadedBullet", lastBulletData);
+        }
         for (int i = 0; i < reloadingBullets.size(); ++i) {
             IWrapperNBT bulletData = InterfaceManager.coreInterface.getNewNBTWrapper();
             bulletData.setPackItem(reloadingBullets.get(i).definition, "");
