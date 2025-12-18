@@ -41,8 +41,6 @@ public class WeaponHUDOverlay {
     private static final ResourceLocation TEXTURE_LINE = ResourceLocation.fromNamespaceAndPath("mts", "textures/overlay/ammo_bar/fire_mode/line.png");
     private static final ResourceLocation TEXTURE_AMMO_STACK = ResourceLocation.fromNamespaceAndPath("mts", "textures/overlay/ammo_bar/fire_mode/ammo_stack.png");
 
-    private static int renderCount = 0;
-
     /**
      * Precise blit that accepts float coordinates - exactly like Superb Warfare's RenderHelper.preciseBlit().
      * This allows sub-pixel positioning for better alignment.
@@ -108,14 +106,10 @@ public class WeaponHUDOverlay {
             }
         }
 
-        // If we found a valid handheld gun item, check if EntityPlayerGun has spawned for more data
-        if (heldGunItem != null) {
-            EntityPlayerGun playerGun = EntityPlayerGun.playerClientGuns.get(player.getID());
-            if (playerGun != null && playerGun.activeGun != null) {
-                gun = playerGun.activeGun;
-            }
-        } else {
-            // No handheld gun - check for vehicle gun
+        // Check for vehicle gun (if no handheld gun)
+        // NOTE: For handheld guns, we read from ItemStack NBT (Superb Warfare approach)
+        // gun entity is only used for vehicle-mounted guns
+        if (heldGunItem == null) {
             if (player.getEntityRiding() instanceof PartSeat) {
                 PartSeat seat = (PartSeat) player.getEntityRiding();
                 if (seat.canControlGuns && seat.activeGunItem != null && seat.gunGroups.containsKey(seat.activeGunItem)) {
@@ -128,10 +122,15 @@ public class WeaponHUDOverlay {
             }
         }
 
-        // Only render if we have HUD enabled (either from held item or vehicle gun)
+        // Only render if we have HUD enabled
         if (hudDef == null || !hudDef.enabled) {
             return;
         }
+
+        // Like Superb Warfare: ALWAYS render HUD immediately, even if NBT is missing/incomplete
+        // Superb Warfare's AmmoBarOverlay (line 52) calls from(stack) with NO checks - just reads NBT
+        // Fire mode code has fallback logic to use gun definition defaults when NBT is missing (lines 340-347)
+        // This ensures instant HUD display when switching weapons (no delay waiting for entity spawn/sync)
 
         int x = screenWidth;
         int y = screenHeight;
@@ -139,59 +138,43 @@ public class WeaponHUDOverlay {
         var poseStack = guiGraphics.pose();
 
         // === DATA EXTRACTION ===
-        // Get data from PartGun if available, otherwise fall back to held item data for instant display
-        ItemStack gunItemStack;
-        int ammoCount;
-        String gunName;
+        // Read from ItemStack NBT (synced every tick by inventoryTick)
+        if (heldGunItem == null) {
+            return;
+        }
+
+        ItemStack gunItemStack = ((WrapperItemStack) heldGunItem.getNewStack(null)).stack;
+        String gunName = heldGunItem.getItemName();
+        int ammoCount = 0;
         ItemBullet loadedBullet = null;
 
-        if (gun != null) {
-            // Full data available from PartGun entity
-            gunItemStack = ((WrapperItemStack) gun.cachedItem.getNewStack(null)).stack;
-            ammoCount = (int) gun.getOrCreateVariable("gun_ammo_count").currentValue;
-            gunName = gun.cachedItem.getItemName();
-            loadedBullet = gun.lastLoadedBullet;
-        } else if (heldGunItem != null) {
-            // Instant display - get data from held item (before EntityPlayerGun spawns)
-            gunItemStack = ((WrapperItemStack) heldGunItem.getNewStack(null)).stack;
-            gunName = heldGunItem.getItemName();
-            // Get ammo count and lastLoadedBullet from NBT data
-            if (heldGunData != null) {
-                // Ammo count is stored as loadedBullet0, loadedBullet1, etc. with "count" field
-                // Sum up all the counts from loadedBullets
-                ammoCount = 0;
-                int loadedBulletsSize = heldGunData.getInteger("loadedBulletsSize");
-                for (int i = 0; i < loadedBulletsSize; i++) {
-                    if (heldGunData.hasKey("loadedBullet" + i)) {
-                        IWrapperNBT bulletData = heldGunData.getData("loadedBullet" + i);
-                        if (bulletData != null) {
-                            ammoCount += bulletData.getInteger("count");
-                            // Get the first loaded bullet type for display
-                            if (i == 0 && loadedBullet == null) {
-                                AItemBase bulletItem = bulletData.getPackItem();
-                                if (bulletItem instanceof ItemBullet) {
-                                    loadedBullet = (ItemBullet) bulletItem;
-                                }
+        // Read ammo count and bullet from ItemStack NBT
+        if (heldGunData != null) {
+            int loadedBulletsSize = heldGunData.getInteger("loadedBulletsSize");
+            for (int i = 0; i < loadedBulletsSize; i++) {
+                if (heldGunData.hasKey("loadedBullet" + i)) {
+                    IWrapperNBT bulletData = heldGunData.getData("loadedBullet" + i);
+                    if (bulletData != null) {
+                        ammoCount += bulletData.getInteger("count");
+                        if (i == 0 && loadedBullet == null) {
+                            AItemBase bulletItem = bulletData.getPackItem();
+                            if (bulletItem instanceof ItemBullet) {
+                                loadedBullet = (ItemBullet) bulletItem;
                             }
                         }
                     }
                 }
-                // If no loaded bullets, try to get lastLoadedBullet for empty gun display
-                if (loadedBullet == null && heldGunData.hasKey("lastLoadedBullet")) {
-                    IWrapperNBT lastBulletData = heldGunData.getData("lastLoadedBullet");
-                    if (lastBulletData != null) {
-                        AItemBase bulletItem = lastBulletData.getPackItem();
-                        if (bulletItem instanceof ItemBullet) {
-                            loadedBullet = (ItemBullet) bulletItem;
-                        }
+            }
+            // If no loaded bullets, try lastLoadedBullet
+            if (loadedBullet == null && heldGunData.hasKey("lastLoadedBullet")) {
+                IWrapperNBT lastBulletData = heldGunData.getData("lastLoadedBullet");
+                if (lastBulletData != null) {
+                    AItemBase bulletItem = lastBulletData.getPackItem();
+                    if (bulletItem instanceof ItemBullet) {
+                        loadedBullet = (ItemBullet) bulletItem;
                     }
                 }
-            } else {
-                ammoCount = 0;
             }
-        } else {
-            // This shouldn't happen since we checked hudDef above, but just in case
-            return;
         }
 
         // === GUN ICON - exactly like Superb Warfare ===
@@ -272,7 +255,10 @@ public class WeaponHUDOverlay {
         // Superb Warfare uses preciseBlit with float position: (x - 62, y - 20.5f)
 
         // Display the loaded bullet (from PartGun or NBT data)
-        if (loadedBullet != null) {
+        // Show for ALL guns with capacity > 0 - clipless guns still have loaded bullets,
+        // they just load directly without magazines (e.g., flare gun, confetti gun)
+        boolean hasAmmoCapacity = heldGunItem.definition.gun.capacity > 0;
+        if (loadedBullet != null && hasAmmoCapacity) {
             // Render ammo_stack texture (the brackets) using preciseBlit for sub-pixel accuracy
             // Superb Warfare: RenderHelper.preciseBlit(gui, AMMO_STACK, (x - 62).toFloat(), y - 20.5f, 0f, 0f, 24f, 8.5f, 24f, 24f)
             preciseBlit(
@@ -337,36 +323,33 @@ public class WeaponHUDOverlay {
         // === FIRE MODE SECTION ===
         // Supports 3 fire modes: semi, auto, burst
         // With backward compatibility for legacy isSemiAuto boolean
-        // TODO: Implement runtime fire mode switching - see docs/ammo-system-analysis.md Phase 4
+        // Runtime fire mode switching is now implemented!
 
         // Render keybind [N] at EXACT Superb Warfare position: x - 111.5f, y - 20
         guiGraphics.drawString(font, "[N]", x - 111.5f, (float)(y - 20), 0xFFFFFF, false);
 
-        // Determine fire mode from gun definition
-        // Priority: fireModes list > defaultFireMode > isSemiAuto (legacy) > auto (default)
-        String currentFireMode = "auto";  // Default to automatic
-
-        // Get the gun definition to check fire modes
-        minecrafttransportsimulator.jsondefs.JSONPart.JSONPartGun gunDef = null;
-        if (gun != null && gun.definition.gun != null) {
-            gunDef = gun.definition.gun;
-        } else if (heldGunItem != null && heldGunItem.definition.gun != null) {
-            gunDef = heldGunItem.definition.gun;
-        }
-
-        if (gunDef != null) {
-            // Check for new fireModes list first
-            if (gunDef.fireModes != null && !gunDef.fireModes.isEmpty()) {
-                // Use defaultFireMode if specified, otherwise first mode in list
-                if (gunDef.defaultFireMode != null && gunDef.fireModes.contains(gunDef.defaultFireMode)) {
-                    currentFireMode = gunDef.defaultFireMode;
+        // Get current fire mode from NBT (like Superb Warfare reads from ItemStack)
+        // NBT is kept fresh by EntityPlayerGun saving every client tick
+        String currentFireMode = "auto";  // default
+        if (heldGunData != null && heldGunData.hasKey("currentFireModeIndex")) {
+            int fireModeIndex = heldGunData.getInteger("currentFireModeIndex");
+            // Get fire modes from gun definition
+            if (heldGunItem.definition.gun.fireModes != null && !heldGunItem.definition.gun.fireModes.isEmpty()) {
+                if (fireModeIndex >= 0 && fireModeIndex < heldGunItem.definition.gun.fireModes.size()) {
+                    currentFireMode = heldGunItem.definition.gun.fireModes.get(fireModeIndex);
                 } else {
-                    currentFireMode = gunDef.fireModes.get(0);
+                    currentFireMode = heldGunItem.definition.gun.fireModes.get(0);
                 }
-                // TODO: When runtime switching is implemented, read currentFireModeIndex from PartGun
             } else {
                 // Backward compatibility: use legacy isSemiAuto boolean
-                currentFireMode = gunDef.isSemiAuto ? "semi" : "auto";
+                currentFireMode = heldGunItem.definition.gun.isSemiAuto ? "semi" : "auto";
+            }
+        } else {
+            // No NBT data yet, use gun definition defaults
+            if (heldGunItem.definition.gun.fireModes != null && !heldGunItem.definition.gun.fireModes.isEmpty()) {
+                currentFireMode = heldGunItem.definition.gun.fireModes.get(0);
+            } else {
+                currentFireMode = heldGunItem.definition.gun.isSemiAuto ? "semi" : "auto";
             }
         }
 

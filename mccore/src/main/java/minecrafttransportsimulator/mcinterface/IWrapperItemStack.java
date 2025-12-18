@@ -20,6 +20,13 @@ public interface IWrapperItemStack {
     boolean isCompleteMatch(IWrapperItemStack other);
 
     /**
+     * Returns true if the passed-in stack wraps the same underlying ItemStack object.
+     * This checks object identity, not content equality.
+     * Used to detect when a player replaced an item in their inventory with a different stack.
+     */
+    boolean isSameStack(IWrapperItemStack other);
+
+    /**
      * Returns the furnace burning fuel amount (in ticks) for this item.
      * Only returns the value for one item in the stack, not all items.
      */

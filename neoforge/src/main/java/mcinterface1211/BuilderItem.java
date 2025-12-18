@@ -226,6 +226,101 @@ public class BuilderItem extends Item implements IBuilderItemInterface {
     }
 
     /**
+     * This is called by the main MC system every tick for items in inventory.
+     * Like Superb Warfare, we use this to initialize gun NBT data immediately when the item enters inventory.
+     * This ensures ItemStack NBT is always populated with valid data before the HUD tries to read it.
+     *
+     * IMPORTANT: We call super.inventoryTick() first to maintain compatibility with other mods!
+     */
+    @Override
+    public void inventoryTick(ItemStack stack, Level world, net.minecraft.world.entity.Entity entity, int slot, boolean selected) {
+        // ALWAYS call super first to maintain vanilla behavior and mod compatibility
+        super.inventoryTick(stack, world, entity, slot, selected);
+
+        if (item instanceof ItemPartGun) {
+            ItemPartGun gunItem = (ItemPartGun) item;
+            // Only process handheld guns
+            if (gunItem.definition.gun.handHeld) {
+                WrapperItemStack wrapperStack = new WrapperItemStack(stack);
+
+                // CLIENT SIDE: Sync gun entity state to ItemStack NBT for HUD display
+                // This mirrors what server does, ensuring HUD has fresh data without sync delay
+                if (world.isClientSide) {
+                    if (entity instanceof net.minecraft.world.entity.player.Player) {
+                        net.minecraft.world.entity.player.Player mcPlayer = (net.minecraft.world.entity.player.Player) entity;
+                        minecrafttransportsimulator.mcinterface.IWrapperPlayer player = new WrapperPlayer(mcPlayer);
+
+                        // Check if this stack is being held in main hand
+                        if (selected && player.getHeldItem() == item) {
+                            // Get the gun entity for this player (if it exists)
+                            minecrafttransportsimulator.entities.instances.EntityPlayerGun gunEntity =
+                                minecrafttransportsimulator.entities.instances.EntityPlayerGun.playerClientGuns.get(player.getID());
+
+                            // If gun entity exists and is for THIS gun, save its state to ItemStack
+                            if (gunEntity != null && gunEntity.activeGun != null && gunEntity.activeGun.definition == gunItem.definition) {
+                                minecrafttransportsimulator.mcinterface.IWrapperItemStack entityGunStack = gunEntity.getGunStack();
+                                if (entityGunStack != null && entityGunStack.isSameStack(wrapperStack)) {
+                                    // Same stack - save gun state for HUD to read
+                                    minecrafttransportsimulator.mcinterface.IWrapperNBT existingData = wrapperStack.getData();
+                                    minecrafttransportsimulator.mcinterface.IWrapperNBT nbtToSave = existingData != null ? existingData : InterfaceManager.coreInterface.getNewNBTWrapper();
+                                    wrapperStack.setData(gunEntity.activeGun.save(nbtToSave));
+                                }
+                            }
+                        }
+                    }
+
+                    // Initialize fire mode if missing (for fresh guns from creative)
+                    minecrafttransportsimulator.mcinterface.IWrapperNBT data = wrapperStack.getData();
+                    if (data == null || !data.hasKey("currentFireModeIndex")) {
+                        minecrafttransportsimulator.mcinterface.IWrapperNBT nbtData;
+                        if (data != null) {
+                            nbtData = data;
+                        } else {
+                            nbtData = InterfaceManager.coreInterface.getNewNBTWrapper();
+                        }
+
+                        int defaultFireModeIndex = 0;
+                        if (gunItem.definition.gun.fireModes != null && !gunItem.definition.gun.fireModes.isEmpty()) {
+                            if (gunItem.definition.gun.defaultFireMode != null) {
+                                int index = gunItem.definition.gun.fireModes.indexOf(gunItem.definition.gun.defaultFireMode);
+                                defaultFireModeIndex = index >= 0 ? index : 0;
+                            }
+                        }
+
+                        nbtData.setInteger("currentFireModeIndex", defaultFireModeIndex);
+                        wrapperStack.setData(nbtData);
+                    }
+                } else if (entity instanceof net.minecraft.world.entity.player.Player) {
+                    // SERVER SIDE: Update gun NBT from gun entity if player is holding it
+                    net.minecraft.world.entity.player.Player mcPlayer = (net.minecraft.world.entity.player.Player) entity;
+                    minecrafttransportsimulator.mcinterface.IWrapperPlayer player = new WrapperPlayer(mcPlayer);
+
+                    // Check if this stack is being held in main hand
+                    if (selected && player.getHeldItem() == item) {
+                        // Get the gun entity for this player (if it exists)
+                        minecrafttransportsimulator.entities.instances.EntityPlayerGun gunEntity =
+                            minecrafttransportsimulator.entities.instances.EntityPlayerGun.playerServerGuns.get(player.getID());
+
+                        // If gun entity exists and is for THIS gun, save its state to THIS ItemStack
+                        if (gunEntity != null && gunEntity.activeGun != null && gunEntity.activeGun.definition == gunItem.definition) {
+                            // Check if this ItemStack is the SAME one the gun entity was created from
+                            // If player replaced the gun in creative, gunEntity.getGunStack() will be different
+                            minecrafttransportsimulator.mcinterface.IWrapperItemStack entityGunStack = gunEntity.getGunStack();
+                            if (entityGunStack != null && entityGunStack.isSameStack(wrapperStack)) {
+                                // Same stack - save gun state normally
+                                minecrafttransportsimulator.mcinterface.IWrapperNBT existingData = wrapperStack.getData();
+                                minecrafttransportsimulator.mcinterface.IWrapperNBT nbtToSave = existingData != null ? existingData : InterfaceManager.coreInterface.getNewNBTWrapper();
+                                wrapperStack.setData(gunEntity.activeGun.save(nbtToSave));
+                            }
+                            // If different stack (player replaced it), don't save - let EntityPlayerGun detect and respawn
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /**
      * This is called by the main MC system after the item's use timer has expired.
      * This is normally instant, as {@link #getMaxItemUseDuration(ItemStack)} is 0.
      * If this item is food, and a player is holding the item, have it apply to them.

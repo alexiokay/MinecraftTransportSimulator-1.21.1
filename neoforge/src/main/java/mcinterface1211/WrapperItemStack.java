@@ -41,6 +41,13 @@ public class WrapperItemStack implements IWrapperItemStack {
     }
 
     @Override
+    public boolean isSameStack(IWrapperItemStack other) {
+        if (other == null) return false;
+        // Compare underlying MC ItemStack objects by identity (same object, not just same content)
+        return this.stack == ((WrapperItemStack) other).stack;
+    }
+
+    @Override
     public int getFurnaceFuelValue() {
         // In NeoForge 1.21.1, use ItemStack.getBurnTime() directly instead of ForgeHooks.getBurnTime()
         return stack.getBurnTime(RecipeType.SMELTING);

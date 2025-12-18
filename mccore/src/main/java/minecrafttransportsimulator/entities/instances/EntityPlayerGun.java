@@ -8,7 +8,6 @@ import minecrafttransportsimulator.baseclasses.BoundingBox;
 import minecrafttransportsimulator.baseclasses.RotationMatrix;
 import minecrafttransportsimulator.entities.components.AEntityB_Existing;
 import minecrafttransportsimulator.entities.components.AEntityF_Multipart;
-import minecrafttransportsimulator.entities.instances.PartGun.GunState;
 import minecrafttransportsimulator.items.components.AItemBase;
 import minecrafttransportsimulator.items.components.AItemPack;
 import minecrafttransportsimulator.items.instances.ItemPartGun;
@@ -39,8 +38,15 @@ public class EntityPlayerGun extends AEntityF_Multipart<JSONDummyPartProvider> {
     private final RotationMatrix handRotation = new RotationMatrix();
     private int hotbarSelected = -1;
     private IWrapperItemStack gunStack;
-    private boolean didGunFireLastTick;
     public PartGun activeGun;
+
+    /**
+     * Returns the ItemStack this gun entity was created from.
+     * Used by inventoryTick to check if the current stack matches the gun entity's stack.
+     */
+    public IWrapperItemStack getGunStack() {
+        return gunStack;
+    }
 
     public EntityPlayerGun(AWrapperWorld world, IWrapperPlayer placingPlayer, IWrapperNBT data) {
         super(world, placingPlayer, null, data);
@@ -136,7 +142,13 @@ public class EntityPlayerGun extends AEntityF_Multipart<JSONDummyPartProvider> {
             //Check if the player is specator, if so, we don't do any gun logic.
             if (player.isSpectator()) {
                 if (activeGun != null) {
-                    saveGun(true);
+                    // Save gun state before removing
+                    if (gunStack != null) {
+                        IWrapperNBT existingData = gunStack.getData();
+                        IWrapperNBT nbtToSave = existingData != null ? existingData : InterfaceManager.coreInterface.getNewNBTWrapper();
+                        gunStack.setData(activeGun.save(nbtToSave));
+                    }
+                    removePart(activeGun, true, true);
                 }
                 return;
             }
@@ -160,13 +172,46 @@ public class EntityPlayerGun extends AEntityF_Multipart<JSONDummyPartProvider> {
                 }
             }
 
+            // CLIENT SIDE: Keep gunStack reference fresh
+            // When player replaces gun with same type, server respawns entity which syncs to client
+            // But client's gunStack might be stale. Refresh it to match current held stack.
+            if (world.isClient() && activeGun != null && gunStack != null) {
+                IWrapperItemStack currentStack = player.getHeldStack();
+                if (currentStack != null && !gunStack.isSameStack(currentStack)) {
+                    // Stack changed but we still have same gun type - update our reference
+                    AItemBase heldItem = player.getHeldItem();
+                    if (heldItem instanceof ItemPartGun && ((ItemPartGun) heldItem).definition == activeGun.definition) {
+                        gunStack = currentStack;
+                        hotbarSelected = player.getHotbarIndex();
+                    }
+                }
+            }
+
             if (!world.isClient()) {
                 AItemBase heldItem = player.getHeldItem();
                 ItemPartGun heldGun = heldItem instanceof ItemPartGun ? (ItemPartGun) heldItem : null;
                 if (activeGun != null) {
                     //Check to make sure if we had a gun, that it didn't change.
-                    if (heldGun == null || activeGun.definition != heldGun.definition || hotbarSelected != player.getHotbarIndex()) {
-                        saveGun(true);
+                    //Also check if ItemStack itself changed (player replaced gun with same type in creative)
+                    boolean gunChanged = heldGun == null || activeGun.definition != heldGun.definition || hotbarSelected != player.getHotbarIndex();
+
+                    // Check if ItemStack reference changed (same gun type but different item instance)
+                    if (!gunChanged && gunStack != null) {
+                        IWrapperItemStack currentStack = player.getHeldStack();
+                        if (currentStack != null && !gunStack.isSameStack(currentStack)) {
+                            gunChanged = true;
+                        }
+                    }
+
+                    if (gunChanged) {
+                        // Save gun state to cached gunStack before removing
+                        // gunStack is from when gun was spawned, so saves to the OLD gun's ItemStack
+                        if (gunStack != null) {
+                            IWrapperNBT existingData = gunStack.getData();
+                            IWrapperNBT nbtToSave = existingData != null ? existingData : InterfaceManager.coreInterface.getNewNBTWrapper();
+                            gunStack.setData(activeGun.save(nbtToSave));
+                        }
+                        removePart(activeGun, true, true);
                         return;
                     }
                 } else {
@@ -229,14 +274,9 @@ public class EntityPlayerGun extends AEntityF_Multipart<JSONDummyPartProvider> {
                 }
                 position.add(player.getHeadPosition());
 
-                if (!world.isClient()) {
-                    //Save gun data if we stopped firing the prior tick.
-                    if (activeGun.state.isAtLeast(GunState.FIRING_CURRENTLY)) {
-                        didGunFireLastTick = true;
-                    } else if (didGunFireLastTick) {
-                        saveGun(false);
-                    }
-                }
+                // NOTE: Gun state persistence is handled by BuilderItem.inventoryTick() (Superb Warfare approach)
+                // inventoryTick saves gun entity state to ItemStack every tick on server
+                // This ensures the CURRENT ItemStack always has up-to-date data
 
                 //Set the equipped state.  We need to make sure that the gun has been ticked at least once for this to work.
                 //The first tick will update all animations, which are required to see a 0 before a 1 to do a transition.
@@ -320,11 +360,16 @@ public class EntityPlayerGun extends AEntityF_Multipart<JSONDummyPartProvider> {
         //Do nothing and don't add any interaction.  This could block player actions.
     }
 
-    private void saveGun(boolean remove) {
-        gunStack.setData(activeGun.save(InterfaceManager.coreInterface.getNewNBTWrapper()));
-        didGunFireLastTick = false;
-        if (remove) {
-            removePart(activeGun, true, true);
+    /**
+     * Public method to save gun state to ItemStack.
+     * Used when gun state changes (like fire mode) need to be persisted immediately.
+     * NOTE: Primary persistence is handled by BuilderItem.inventoryTick() (Superb Warfare approach)
+     */
+    public void saveGunState() {
+        if (activeGun != null && gunStack != null) {
+            IWrapperNBT existingData = gunStack.getData();
+            IWrapperNBT nbtToSave = existingData != null ? existingData : InterfaceManager.coreInterface.getNewNBTWrapper();
+            gunStack.setData(activeGun.save(nbtToSave));
         }
     }
 

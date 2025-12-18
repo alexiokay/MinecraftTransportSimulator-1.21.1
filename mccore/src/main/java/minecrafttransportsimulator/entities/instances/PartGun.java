@@ -112,6 +112,8 @@ public class PartGun extends APart {
     public boolean isHandHeldGunEquipped;
     public boolean isHandHeldGunReloadRequested;
     public boolean isRunningInCoaxialMode;
+    public int currentFireModeIndex;
+    private int burstShotsRemaining;
     private int camOffset;
     private int cooldownTimeRemaining;
     private int reloadDelayRemaining;
@@ -262,10 +264,18 @@ public class PartGun extends APart {
             } else {
                 randomGenerator = new Random();
             }
+            // Load fire mode index - if not present in NBT (old saved gun), use default
+            if (data.hasKey("currentFireModeIndex")) {
+                this.currentFireModeIndex = data.getInteger("currentFireModeIndex");
+            } else {
+                this.currentFireModeIndex = getDefaultFireModeIndex();
+            }
         } else {
             this.state = GunState.INACTIVE;
             this.internalOrientation = new RotationMatrix();
             randomGenerator = new Random();
+            // Initialize fire mode from default
+            this.currentFireModeIndex = getDefaultFireModeIndex();
             if (definition.gun.preloadedBullet != null) {
                 String[] splitName = definition.gun.preloadedBullet.split(":");
                 ItemBullet loadedBullet = PackParser.getItem(splitName[0], splitName[1]);
@@ -553,6 +563,16 @@ public class PartGun extends APart {
                             firedSinceRequested = true;
                             cycledGun = true;
                             lastMillisecondFired = System.currentTimeMillis();
+
+                            // Handle burst mode - initialize or decrement burst counter
+                            if ("burst".equals(getCurrentFireMode())) {
+                                if (burstShotsRemaining == 0) {
+                                    // First shot of burst - initialize counter
+                                    burstShotsRemaining = definition.gun.burstCount > 0 ? definition.gun.burstCount - 1 : 2; // -1 because we just fired
+                                } else {
+                                    burstShotsRemaining--;
+                                }
+                            }
                             if (definition.gun.muzzleGroups.size() == ++currentMuzzleGroupIndex) {
                                 currentMuzzleGroupIndex = 0;
                             }
@@ -577,6 +597,7 @@ public class PartGun extends APart {
                 }
             } else {
                 firedSinceRequested = false;
+                burstShotsRemaining = 0; // Reset burst when trigger released
             }
 
             //Handle reload delay and recoil.
@@ -632,6 +653,11 @@ public class PartGun extends APart {
                     firedBullets.clear();//Clear fired bullets in case we haven't used them for any animations, don't want an overflow list.
                     if (!world.isClient()) {
                         InterfaceManager.packetInterface.sendToAllClients(new PacketPartGun(this, PacketPartGun.Request.BULLETS_PRESENT));
+                    }
+
+                    // For handheld guns, save state to ItemStack immediately so HUD shows correct ammo count
+                    if (isHandHeld && masterEntity instanceof EntityPlayerGun) {
+                        ((EntityPlayerGun) masterEntity).saveGunState();
                     }
                     if (reloadingBullets.isEmpty() && reloadEndTimeRemaining == 0) {
                         //No winddown, and no bullets left to reload, reloading ends here.
@@ -717,10 +743,27 @@ public class PartGun extends APart {
         yawRecoilVar.setTo(definition.gun.yawRecoil, false);
         autoReloadVar.setTo(definition.gun.autoReload ? 1 : 0, false);
         blockReloadingVar.setTo(definition.gun.blockReloading ? 1 : 0, false);
-        isSemiAutoVar.setTo(definition.gun.isSemiAuto ? 1 : 0, false);
+        // Set semi-auto based on current fire mode (supports runtime switching)
+        String currentMode = getCurrentFireMode();
+        boolean isBurstMode = "burst".equals(currentMode);
+        boolean isSemiMode = "semi".equals(currentMode);
+        boolean isAutoMode = "auto".equals(currentMode);
+
+        // For semi and burst: stop after firing (until trigger released)
+        // For burst: also allow continued firing while burstShotsRemaining > 0
+        boolean canFireBasedOnMode;
+        if (isAutoMode) {
+            canFireBasedOnMode = true; // Always can fire in auto
+        } else if (isBurstMode) {
+            canFireBasedOnMode = !firedSinceRequested || burstShotsRemaining > 0;
+        } else {
+            canFireBasedOnMode = !firedSinceRequested; // Semi-auto
+        }
+
+        isSemiAutoVar.setTo((isSemiMode || isBurstMode) ? 1 : 0, false);
         canLockTargetsVar.setTo(definition.gun.canLockTargets ? 1 : 0, false);
         twoHandedVar.setTo(definition.gun.isTwoHanded ? 1 : 0, false);
-        ableToFireVar.setTo(windupTimeCurrent == definition.gun.windupTime && cooldownTimeRemaining == 0 && !isReloading && (!isSemiAutoVar.isActive || !firedSinceRequested) ? 1 : 0, false);
+        ableToFireVar.setTo(windupTimeCurrent == definition.gun.windupTime && cooldownTimeRemaining == 0 && !isReloading && canFireBasedOnMode ? 1 : 0, false);
         firingRequestedVar.setTo(playerHoldingTrigger ? 1 : 0, false);
     }
 
@@ -1116,6 +1159,12 @@ public class PartGun extends APart {
                         //Able to load, do so now (above check shouldn't matter for hand-helds since those always have capacity, but common code is common).
                         setReloadVars(bulletItem, bulletQty);
                         InterfaceManager.packetInterface.sendToAllClients(new PacketPartGun(this, bulletItem, bulletQty));
+
+                        // For handheld guns, save state to ItemStack immediately to ensure HUD shows correct ammo count
+                        if (isHandHeld && masterEntity instanceof EntityPlayerGun) {
+                            ((EntityPlayerGun) masterEntity).saveGunState();
+                        }
+
                         return true;
                     }
                 }
@@ -1150,6 +1199,24 @@ public class PartGun extends APart {
     }
 
     /**
+     * Completes the reload by moving bullets from reloading to loaded.
+     * Used on client side when receiving BULLETS_PRESENT packet from server.
+     */
+    public void completeReload() {
+        if (!reloadingBullets.isEmpty()) {
+            ItemBullet bulletToLoad = reloadingBullets.remove(0);
+            int countToLoad = reloadingBulletCounts.remove(0);
+            loadedBullets.add(bulletToLoad);
+            loadedBulletCounts.add(countToLoad);
+            if (loadedBullets.size() == 1) {
+                lastLoadedBullet = bulletToLoad;
+            }
+            loadedBulletCount += countToLoad;
+            reloadingBulletCount -= countToLoad;
+        }
+    }
+
+    /**
      * Returns the text that represents the bullet loaded in this gun.
      */
     public String getBulletText() {
@@ -1158,6 +1225,81 @@ public class PartGun extends APart {
         } else {
             return "EMPTY";
         }
+    }
+
+    /**
+     * Gets the default fire mode index based on JSON definition.
+     * Checks fireModes list and defaultFireMode, falls back to isSemiAuto.
+     */
+    private int getDefaultFireModeIndex() {
+        if (definition.gun.fireModes != null && !definition.gun.fireModes.isEmpty()) {
+            if (definition.gun.defaultFireMode != null) {
+                int index = definition.gun.fireModes.indexOf(definition.gun.defaultFireMode);
+                return index >= 0 ? index : 0;
+            }
+            return 0;
+        }
+        return 0; // Default for legacy isSemiAuto-only guns
+    }
+
+    /**
+     * Gets the current fire mode as a string.
+     * Returns "semi", "auto", or "burst" based on currentFireModeIndex and definition.
+     */
+    public String getCurrentFireMode() {
+        if (definition.gun.fireModes != null && !definition.gun.fireModes.isEmpty()) {
+            if (currentFireModeIndex >= 0 && currentFireModeIndex < definition.gun.fireModes.size()) {
+                return definition.gun.fireModes.get(currentFireModeIndex);
+            }
+            return definition.gun.fireModes.get(0);
+        }
+        // Backward compatibility: use legacy isSemiAuto boolean
+        return definition.gun.isSemiAuto ? "semi" : "auto";
+    }
+
+    /**
+     * Cycles to the next fire mode if multiple modes are available.
+     * Called when player presses the fire mode switch key (N).
+     */
+    public void cycleFireMode() {
+        if (definition.gun.fireModes != null && definition.gun.fireModes.size() > 1) {
+            currentFireModeIndex = (currentFireModeIndex + 1) % definition.gun.fireModes.size();
+        }
+    }
+
+    /**
+     * Cycles to the next fire mode (arrow up).
+     */
+    public void cycleFireModeUp() {
+        if (definition.gun.fireModes != null && definition.gun.fireModes.size() > 1) {
+            currentFireModeIndex = (currentFireModeIndex + 1) % definition.gun.fireModes.size();
+        }
+    }
+
+    /**
+     * Cycles to the previous fire mode (arrow down).
+     */
+    public void cycleFireModeDown() {
+        if (definition.gun.fireModes != null && definition.gun.fireModes.size() > 1) {
+            currentFireModeIndex = (currentFireModeIndex - 1 + definition.gun.fireModes.size()) % definition.gun.fireModes.size();
+        }
+    }
+
+    /**
+     * Sets the fire mode to a specific index.
+     * Used when syncing fire mode changes from client to server.
+     */
+    public void setFireModeIndex(int index) {
+        if (definition.gun.fireModes != null && index >= 0 && index < definition.gun.fireModes.size()) {
+            currentFireModeIndex = index;
+        }
+    }
+
+    /**
+     * Returns true if this gun has multiple fire modes that can be switched.
+     */
+    public boolean hasMultipleFireModes() {
+        return definition.gun.fireModes != null && definition.gun.fireModes.size() > 1;
     }
 
     /**
@@ -1495,6 +1637,7 @@ public class PartGun extends APart {
         data.setInteger("reloadStartTimeRemaining", reloadStartTimeRemaining);
         data.setInteger("reloadMainTimeRemaining", reloadMainTimeRemaining);
         data.setInteger("reloadEndTimeRemaining", reloadEndTimeRemaining);
+        data.setInteger("currentFireModeIndex", currentFireModeIndex);
         long randomSeed = randomGenerator.nextLong();
         data.setBoolean("savedSeed", true);
         data.setInteger("randomSeedPart1", (int) (randomSeed >> 32));
