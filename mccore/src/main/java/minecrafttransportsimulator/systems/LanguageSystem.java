@@ -527,6 +527,9 @@ public class LanguageSystem {
     public static final LanguageEntry INPUT_GUN_FIRE = new LanguageEntry("input.gun_fire", "Gun");
     public static final LanguageEntry INPUT_GUN_SWITCH = new LanguageEntry("input.gun_switch", "Switch Gun");
     public static final LanguageEntry INPUT_GUN_RELOAD = new LanguageEntry("input.gun.reload", "Reload Gun");
+    public static final LanguageEntry INPUT_GUN_FIREMODE = new LanguageEntry("input.gun.firemode", "Fire Mode");
+    public static final LanguageEntry INPUT_GUN_FIREMODE_UP = new LanguageEntry("input.gun.firemode_up", "Fire Mode Up");
+    public static final LanguageEntry INPUT_GUN_FIREMODE_DOWN = new LanguageEntry("input.gun.firemode_down", "Fire Mode Down");
     public static final LanguageEntry INPUT_RADIO = new LanguageEntry("input.radio", "Radio");
     public static final LanguageEntry INPUT_ZOOM_I = new LanguageEntry("input.zoom_i", "ZoomIn");
     public static final LanguageEntry INPUT_ZOOM_O = new LanguageEntry("input.zoom_o", "ZoomOut");

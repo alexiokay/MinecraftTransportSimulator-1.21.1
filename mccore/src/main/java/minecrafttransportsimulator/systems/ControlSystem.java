@@ -101,6 +101,29 @@ public final class ControlSystem {
         if (playerGun != null && playerGun.activeGun != null && !InterfaceManager.clientInterface.isGUIOpen() && ControlsKeyboard.GENERAL_RELOAD.isPressed()) {
             InterfaceManager.packetInterface.sendToServer(new PacketPartGun(playerGun.activeGun, PacketPartGun.Request.RELOAD_HAND));
         }
+
+        // Fire mode switching (N key like Superb Warfare)
+        if (playerGun != null && playerGun.activeGun != null && !InterfaceManager.clientInterface.isGUIOpen() && ControlsKeyboard.GENERAL_FIREMODE.isPressed()) {
+            if (playerGun.activeGun.hasMultipleFireModes()) {
+                playerGun.activeGun.cycleFireMode(); // Update client immediately for instant HUD feedback
+                // Send the NEW fire mode index to server so client and server stay in sync
+                InterfaceManager.packetInterface.sendToServer(new PacketPartGun(playerGun.activeGun, PacketPartGun.Request.SET_FIRE_MODE, playerGun.activeGun.currentFireModeIndex));
+            }
+        }
+
+        // Fire mode switching (Arrow Up/Down like Superb Warfare)
+        if (playerGun != null && playerGun.activeGun != null && !InterfaceManager.clientInterface.isGUIOpen()) {
+            if (ControlsKeyboard.GENERAL_FIREMODE_UP.isPressed() && playerGun.activeGun.hasMultipleFireModes()) {
+                playerGun.activeGun.cycleFireModeDown(); // UP arrow = previous mode (decrease index)
+                // Send the NEW fire mode index to server so client and server stay in sync
+                InterfaceManager.packetInterface.sendToServer(new PacketPartGun(playerGun.activeGun, PacketPartGun.Request.SET_FIRE_MODE, playerGun.activeGun.currentFireModeIndex));
+            }
+            if (ControlsKeyboard.GENERAL_FIREMODE_DOWN.isPressed() && playerGun.activeGun.hasMultipleFireModes()) {
+                playerGun.activeGun.cycleFireModeUp(); // DOWN arrow = next mode (increase index)
+                // Send the NEW fire mode index to server so client and server stay in sync
+                InterfaceManager.packetInterface.sendToServer(new PacketPartGun(playerGun.activeGun, PacketPartGun.Request.SET_FIRE_MODE, playerGun.activeGun.currentFireModeIndex));
+            }
+        }
     }
 
     private static void handleClick(IWrapperPlayer player, EntityPlayerGun playerGun, boolean leftClickDown, boolean leftClickUp, boolean rightClickDown, boolean rightClickUp) {
@@ -690,6 +713,9 @@ public final class ControlSystem {
         GENERAL_CUSTOM3(ControlsJoystick.GENERAL_CUSTOM3, true, "NUMPAD2", LanguageSystem.INPUT_CUSTOM3),
         GENERAL_CUSTOM4(ControlsJoystick.GENERAL_CUSTOM4, true, "NUMPAD3", LanguageSystem.INPUT_CUSTOM4),
         GENERAL_RELOAD(ControlsJoystick.GENERAL_RELOAD, true, "R", LanguageSystem.INPUT_GUN_RELOAD),
+        GENERAL_FIREMODE(ControlsJoystick.GENERAL_FIREMODE, true, "N", LanguageSystem.INPUT_GUN_FIREMODE),
+        GENERAL_FIREMODE_UP(ControlsJoystick.GENERAL_FIREMODE_UP, true, "UP", LanguageSystem.INPUT_GUN_FIREMODE_UP),
+        GENERAL_FIREMODE_DOWN(ControlsJoystick.GENERAL_FIREMODE_DOWN, true, "DOWN", LanguageSystem.INPUT_GUN_FIREMODE_DOWN),
 
         AIRCRAFT_YAW_R(ControlsJoystick.AIRCRAFT_YAW, false, "L", LanguageSystem.INPUT_YAW_R),
         AIRCRAFT_YAW_L(ControlsJoystick.AIRCRAFT_YAW, false, "J", LanguageSystem.INPUT_YAW_L),
@@ -793,6 +819,9 @@ public final class ControlSystem {
         GENERAL_CUSTOM3(false, true, LanguageSystem.INPUT_CUSTOM3),
         GENERAL_CUSTOM4(false, true, LanguageSystem.INPUT_CUSTOM4),
         GENERAL_RELOAD(false, true, LanguageSystem.INPUT_GUN_RELOAD),
+        GENERAL_FIREMODE(false, true, LanguageSystem.INPUT_GUN_FIREMODE),
+        GENERAL_FIREMODE_UP(false, true, LanguageSystem.INPUT_GUN_FIREMODE_UP),
+        GENERAL_FIREMODE_DOWN(false, true, LanguageSystem.INPUT_GUN_FIREMODE_DOWN),
 
         AIRCRAFT_CAMLOCK(false, true, LanguageSystem.INPUT_CAMLOCK),
         AIRCRAFT_YAW(true, false, LanguageSystem.INPUT_YAW),

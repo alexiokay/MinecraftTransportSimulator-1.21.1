@@ -51,11 +51,11 @@ class WrapperNBT implements IWrapperNBT {
 
     @Override
     public void setInteger(String name, int value) {
-        if (value != 0) {
-            tag.putInt(name, value);
-        } else {
-            tag.remove(name);
-        }
+        // CRITICAL FIX: Always save integer values, even if 0
+        // Previous code: if (value != 0) tag.putInt(name, value); else tag.remove(name);
+        // This caused "semi" fire mode (index 0) to be deleted from NBT, resetting to default "auto"
+        // Now we ALWAYS save the value, allowing 0 to be a valid stored value
+        tag.putInt(name, value);
     }
 
     @Override

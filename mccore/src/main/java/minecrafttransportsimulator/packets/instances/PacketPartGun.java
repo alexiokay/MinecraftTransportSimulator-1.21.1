@@ -1,6 +1,7 @@
 package minecrafttransportsimulator.packets.instances;
 
 import io.netty.buffer.ByteBuf;
+import minecrafttransportsimulator.entities.instances.EntityPlayerGun;
 import minecrafttransportsimulator.entities.instances.PartGun;
 import minecrafttransportsimulator.items.instances.ItemBullet;
 import minecrafttransportsimulator.mcinterface.AWrapperWorld;
@@ -19,12 +20,14 @@ public class PacketPartGun extends APacketEntity<PartGun> {
     private final Request stateRequest;
     private final ItemBullet bulletItem;
     private final int bulletQty;
+    private final int fireModeIndex; // For SET_FIRE_MODE requests
 
     public PacketPartGun(PartGun gun, Request stateRequest) {
         super(gun);
         this.stateRequest = stateRequest;
         this.bulletItem = null;
         this.bulletQty = 0;
+        this.fireModeIndex = -1;
     }
 
     public PacketPartGun(PartGun gun, ItemBullet bullet, int bulletQty) {
@@ -32,6 +35,7 @@ public class PacketPartGun extends APacketEntity<PartGun> {
         this.stateRequest = Request.RELOAD_ONCLIENT;
         this.bulletItem = bullet;
         this.bulletQty = bulletQty;
+        this.fireModeIndex = -1;
     }
 
     public PacketPartGun(PartGun gun, Request stateRequest, ItemBullet lastBullet) {
@@ -39,6 +43,15 @@ public class PacketPartGun extends APacketEntity<PartGun> {
         this.stateRequest = stateRequest;
         this.bulletItem = lastBullet;
         this.bulletQty = 0;
+        this.fireModeIndex = -1;
+    }
+
+    public PacketPartGun(PartGun gun, Request stateRequest, int fireModeIndex) {
+        super(gun);
+        this.stateRequest = stateRequest;
+        this.bulletItem = null;
+        this.bulletQty = 0;
+        this.fireModeIndex = fireModeIndex;
     }
 
     public PacketPartGun(ByteBuf buf) {
@@ -47,12 +60,19 @@ public class PacketPartGun extends APacketEntity<PartGun> {
         if (stateRequest == Request.RELOAD_ONCLIENT) {
             this.bulletItem = readItemFromBuffer(buf);
             this.bulletQty = buf.readInt();
+            this.fireModeIndex = -1;
         } else if (stateRequest == Request.BULLETS_OUT) {
             this.bulletItem = readItemFromBuffer(buf);
             this.bulletQty = 0;
+            this.fireModeIndex = -1;
+        } else if (stateRequest == Request.SET_FIRE_MODE) {
+            this.bulletItem = null;
+            this.bulletQty = 0;
+            this.fireModeIndex = buf.readInt();
         } else {
             this.bulletItem = null;
             this.bulletQty = 0;
+            this.fireModeIndex = -1;
         }
     }
 
@@ -65,6 +85,8 @@ public class PacketPartGun extends APacketEntity<PartGun> {
             buf.writeInt(bulletQty);
         } else if (stateRequest == Request.BULLETS_OUT) {
             writeItemToBuffer(bulletItem, buf);
+        } else if (stateRequest == Request.SET_FIRE_MODE) {
+            buf.writeInt(fireModeIndex);
         }
     }
 
@@ -115,6 +137,14 @@ public class PacketPartGun extends APacketEntity<PartGun> {
                 gun.performGunHandheldMovements();
                 break;
             }
+            case SET_FIRE_MODE: {
+                gun.setFireModeIndex(fireModeIndex);
+                // For handheld guns, save state immediately to persist fire mode
+                if (gun.masterEntity instanceof EntityPlayerGun) {
+                    ((EntityPlayerGun) gun.masterEntity).saveGunState();
+                }
+                break;
+            }
         }
         return stateRequest.sendToClients;
     }
@@ -129,7 +159,8 @@ public class PacketPartGun extends APacketEntity<PartGun> {
         AIM_OFF(true),
         BULLETS_OUT(false),
         BULLETS_PRESENT(false),
-        HANDHELD_MOVEMENTS(true);
+        HANDHELD_MOVEMENTS(true),
+        SET_FIRE_MODE(true);
 
         private final boolean sendToClients;
 
