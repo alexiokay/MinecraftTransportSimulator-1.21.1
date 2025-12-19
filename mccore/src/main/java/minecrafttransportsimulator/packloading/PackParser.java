@@ -18,6 +18,7 @@ import minecrafttransportsimulator.items.components.AItemPack;
 import minecrafttransportsimulator.items.components.AItemPart;
 import minecrafttransportsimulator.items.components.AItemPart.AItemPartCreator;
 import minecrafttransportsimulator.items.components.AItemSubTyped;
+import minecrafttransportsimulator.items.instances.ItemBlock;
 import minecrafttransportsimulator.items.instances.ItemBullet;
 import minecrafttransportsimulator.items.instances.ItemDecor;
 import minecrafttransportsimulator.items.instances.ItemInstrument;
@@ -28,6 +29,7 @@ import minecrafttransportsimulator.items.instances.ItemVehicle;
 import minecrafttransportsimulator.jsondefs.AJSONBase;
 import minecrafttransportsimulator.jsondefs.AJSONItem;
 import minecrafttransportsimulator.jsondefs.AJSONMultiModelProvider;
+import minecrafttransportsimulator.jsondefs.JSONBlock;
 import minecrafttransportsimulator.jsondefs.JSONBullet;
 import minecrafttransportsimulator.jsondefs.JSONConfigSettings;
 import minecrafttransportsimulator.jsondefs.JSONDecor;
@@ -133,6 +135,8 @@ public final class PackParser {
                 return 6;
             if (item instanceof ItemInstrument)
                 return 7;
+            if (item instanceof ItemBlock)
+                return 8;
             return Integer.MAX_VALUE;
         }
     };
@@ -500,6 +504,9 @@ public final class PackParser {
                         break;
                     case ITEM:
                         item = new ItemItem((JSONItem) itemDef);
+                        break;
+                    case BLOCK:
+                        item = new ItemBlock((JSONBlock) itemDef);
                         break;
                     case PANEL:
                         //Put the panel in the map in the registry.
