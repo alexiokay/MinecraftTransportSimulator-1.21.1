@@ -562,6 +562,7 @@ public class PartGun extends APart {
                             firedSinceRequested = true;
                             cycledGun = true;
                             lastMillisecondFired = System.currentTimeMillis();
+                            InterfaceManager.coreInterface.logError("[GUN DEBUG] FIRED! isClient=" + world.isClient());
                             handleFireModeAfterShot();
                             if (definition.gun.muzzleGroups.size() == ++currentMuzzleGroupIndex) {
                                 currentMuzzleGroupIndex = 0;
@@ -574,10 +575,8 @@ public class PartGun extends APart {
                             firedThisTick = true;
                             firedSinceRequested = true;
                             lastMillisecondFired = System.currentTimeMillis();
+                            InterfaceManager.coreInterface.logError("[GUN DEBUG] FIRED (clipless)! isClient=" + world.isClient());
                             handleFireModeAfterShot();
-
-                            // Demote state so !gun_firing becomes true for one tick (triggers particles)
-                            state = state.demote(GunState.CONTROLLED);
                         }
                         cycledGun = true;
                     }
@@ -753,7 +752,7 @@ public class PartGun extends APart {
         }
 
         // Determine if we can fire based on mode:
-        // Semi: one shot per trigger press (block after firing until trigger released)
+        // Semi: one shot per trigger press (block after firing until trigger released OR new click after cooldown)
         // Burst: continue active burst, or start new burst (one burst per trigger press)
         // Auto: continuous fire while trigger held
         boolean canFireBasedOnMode;
@@ -774,7 +773,20 @@ public class PartGun extends APart {
         // Use cooldownTimeRemaining <= 1 because cooldown is decremented in update() BEFORE the firing check,
         // so when cooldown is 1 here, it will be 0 by the time the gun checks if it can fire
         ableToFireVar.setTo(windupTimeCurrent == definition.gun.windupTime && cooldownTimeRemaining <= 1 && !isReloading && canFireBasedOnMode ? 1 : 0, false);
-        firingRequestedVar.setTo(playerHoldingTrigger ? 1 : 0, false);
+        // For semi/burst: also consider playerPressedTrigger, not just playerHoldingTrigger
+        // This handles fast clicks where TRIGGER_ON and TRIGGER_OFF arrive in the same tick
+        // For auto: need continuous holding
+        boolean shouldRequestFiring = isAutoMode ? playerHoldingTrigger : (playerHoldingTrigger || playerPressedTrigger);
+        firingRequestedVar.setTo(shouldRequestFiring ? 1 : 0, false);
+
+        // DEBUG: Log trigger state when something interesting happens
+        if (isSemiMode && (playerPressedTrigger || playerHoldingTrigger)) {
+            InterfaceManager.coreInterface.logError("[GUN DEBUG] setVarDefaults: pressed=" + playerPressedTrigger +
+                " holding=" + playerHoldingTrigger + " firedSince=" + firedSinceRequested +
+                " cooldown=" + cooldownTimeRemaining + " canFire=" + canFireBasedOnMode +
+                " ableToFire=" + ableToFireVar.isActive + " shouldRequest=" + shouldRequestFiring +
+                " state=" + state);
+        }
     }
 
     @Override
@@ -1312,6 +1324,7 @@ public class PartGun extends APart {
     public void cycleFireMode() {
         if (definition.gun.fireModes != null && definition.gun.fireModes.size() > 1) {
             currentFireModeIndex = (currentFireModeIndex + 1) % definition.gun.fireModes.size();
+            resetFiringState();
         }
     }
 
@@ -1321,6 +1334,7 @@ public class PartGun extends APart {
     public void cycleFireModeUp() {
         if (definition.gun.fireModes != null && definition.gun.fireModes.size() > 1) {
             currentFireModeIndex = (currentFireModeIndex + 1) % definition.gun.fireModes.size();
+            resetFiringState();
         }
     }
 
@@ -1330,7 +1344,19 @@ public class PartGun extends APart {
     public void cycleFireModeDown() {
         if (definition.gun.fireModes != null && definition.gun.fireModes.size() > 1) {
             currentFireModeIndex = (currentFireModeIndex - 1 + definition.gun.fireModes.size()) % definition.gun.fireModes.size();
+            resetFiringState();
         }
+    }
+
+    /**
+     * Resets firing state when switching fire modes.
+     * This prevents issues like burst shots continuing after switching to auto,
+     * or semi-auto blocking after switching from burst.
+     */
+    private void resetFiringState() {
+        burstShotsRemaining = 0;
+        firedSinceRequested = false;
+        cooldownTimeRemaining = 0;
     }
 
     /**
@@ -1340,6 +1366,7 @@ public class PartGun extends APart {
     public void setFireModeIndex(int index) {
         if (definition.gun.fireModes != null && index >= 0 && index < definition.gun.fireModes.size()) {
             currentFireModeIndex = index;
+            resetFiringState();
         }
     }
 
@@ -1553,7 +1580,15 @@ public class PartGun extends APart {
             case ("gun_active"):
                 return new ComputedVariable(this, variable, partialTicks -> state.isAtLeast(GunState.CONTROLLED) ? 1 : 0, false);
             case ("gun_firing"):
-                return new ComputedVariable(this, variable, partialTicks -> state.isAtLeast(GunState.FIRING_REQUESTED) ? 1 : 0, false);
+                // In auto/burst modes, pulse per-shot (like gun_fired) so animations trigger on each shot
+                // In semi mode, keep original behavior (1 while firing state active)
+                return new ComputedVariable(this, variable, partialTicks -> {
+                    String fireMode = getCurrentFireMode();
+                    if ("auto".equals(fireMode) || "burst".equals(fireMode)) {
+                        return firedThisTick ? 1 : 0;
+                    }
+                    return state.isAtLeast(GunState.FIRING_REQUESTED) ? 1 : 0;
+                }, false);
             case ("gun_fired"):
                 return new ComputedVariable(this, variable, partialTicks -> firedThisTick ? 1 : 0, false);
             case ("gun_muzzleflash"):
