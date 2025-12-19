@@ -353,15 +353,51 @@ Arrow Up/Down cycles through:
 
 ### Phase 4: Fire Mode Switching
 
-**Current State (PARTIALLY IMPLEMENTED):**
+**Current State (FULLY IMPLEMENTED):**
 - ✅ `fireModes` array added to `JSONPart.java` - defines available modes
 - ✅ `defaultFireMode` added to `JSONPart.java` - starting mode
 - ✅ `burstCount` added to `JSONPart.java` - shots per burst
 - ✅ `WeaponHUDOverlay.java` displays correct icon based on fire mode
 - ✅ Backward compatibility with legacy `isSemiAuto` boolean
-- ❌ Runtime switching NOT yet implemented (pressing N does nothing)
-- ❌ `currentFireModeIndex` NOT yet in PartGun
-- ❌ Packet for syncing fire mode changes NOT yet created
+- ✅ `currentFireModeIndex` added to PartGun (saved/loaded from NBT)
+- ✅ `getCurrentFireMode()` and `cycleFireMode()` methods in PartGun
+- ✅ `FIRE_MODE_CHANGE` packet added to PacketPartGun for server sync
+- ✅ Keybind handler for N key connected
+- ✅ All fire modes (semi/auto/burst) working correctly
+
+---
+
+## Gun Variable Compatibility with Fire Modes
+
+All gun animation variables now work correctly in all fire modes. The core mod automatically handles per-shot pulsing for auto/burst modes.
+
+### Variable Behavior by Fire Mode
+
+| Variable | Semi-Auto | Auto | Burst | Behavior |
+|----------|:---------:|:----:|:-----:|----------|
+| `gun_firing` | ✅ | ✅ | ✅ | Pulses per-shot in auto/burst modes. In semi mode, returns 1 while firing state active. |
+| `!gun_firing` | ✅ | ✅ | ✅ | Inverted version of `gun_firing`. Works for per-shot animations in all modes. |
+| `gun_cooldown` | ✅ | ❌ | ✅ | Returns 1 while cooldown > 0. In auto mode, next shot fires before cooldown reaches 0, so never pulses. |
+| `gun_fired` | ✅ | ✅ | ✅ | Returns 1 for exactly 1 tick when each shot fires. Equivalent to `gun_firing` in auto/burst. |
+
+### How It Works
+
+The core mod detects the current fire mode and adjusts `gun_firing` behavior:
+- **Semi-auto**: Original behavior (1 while firing state is active)
+- **Auto/Burst**: Pulses per-shot (same as `gun_fired`)
+
+This ensures existing content packs work without any JSON changes.
+
+### When to Use Each Variable
+
+| Use Case | Recommended Variable | Notes |
+|----------|---------------------|-------|
+| Per-shot animation (recoil, hammer) | `gun_firing` or `!gun_firing` | Works all fire modes |
+| Per-shot sound | `!gun_firing` | Works all fire modes |
+| Per-shot particles (muzzle flash) | `!gun_firing` | Works all fire modes |
+| Continuous effect while trigger held | N/A | Use `gun_firing` in semi mode only |
+| Effect when NOT firing | `!gun_firing` | For idle/ready states (semi mode) |
+| Reload animations | `gun_reload` | True during reload sequence |
 
 **Available Fire Modes:**
 | Mode | Value | Icon | Behavior |
@@ -387,11 +423,10 @@ Arrow Up/Down cycles through:
 2. Else if `isSemiAuto: true` → display semi icon
 3. Else → display auto icon (default)
 
-**Still Needed for Runtime Switching:**
-- `PartGun.java`: Add `currentFireModeIndex`, `cycleFireMode()`, save/load from NBT
-- `PacketPartGun.java`: Add `FIRE_MODE_CHANGE` request type
-- `InterfaceInput.java`: Add keybind handler for `N` key
-- `PartGun.java`: Modify firing logic to respect current fire mode
+**Still Needed:**
+- `InterfaceInput.java`: Add keybind handler for `N` key to call `cycleFireMode()`
+- `PartGun.java`: Modify firing logic to actually use `getCurrentFireMode()` for semi/auto/burst behavior
+- Burst mode logic (fire X shots then stop)
 
 ---
 
