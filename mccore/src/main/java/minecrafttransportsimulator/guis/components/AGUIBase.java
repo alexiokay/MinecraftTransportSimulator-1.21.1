@@ -6,6 +6,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 
 import minecrafttransportsimulator.entities.components.AEntityC_Renderable;
 import minecrafttransportsimulator.guis.instances.GUIOverlay;
+import minecrafttransportsimulator.guis.instances.GUIWeaponHUD;
 import minecrafttransportsimulator.mcinterface.InterfaceManager;
 
 /**
@@ -42,8 +43,9 @@ public abstract class AGUIBase {
     public boolean editingText;
 
     static {
-        //Add the overlay GUI to the GUI listing and keep it there forever.
+        //Add the overlay GUIs to the GUI listing and keep them there forever.
         new GUIOverlay();
+        new GUIWeaponHUD();
     }
 
     public AGUIBase() {
@@ -332,6 +334,15 @@ public abstract class AGUIBase {
      * including buttons and switches!  Does not affect text-rendering as that's its own system.
      */
     public boolean renderTranslucent() {
+        return false;
+    }
+
+    /**
+     * If true, the platform should attempt to render this GUI below vanilla HUD elements.
+     * This is a hint to the platform - if not supported, the GUI renders normally on top.
+     * Used for overlays like weapon HUD that should not obscure vanilla health/hunger bars.
+     */
+    public boolean renderBelowVanilla() {
         return false;
     }
 

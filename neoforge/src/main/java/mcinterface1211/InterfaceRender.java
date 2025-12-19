@@ -39,6 +39,7 @@ import minecrafttransportsimulator.guis.components.AGUIBase;
 import minecrafttransportsimulator.guis.components.GUIComponentItem;
 import minecrafttransportsimulator.mcinterface.AWrapperWorld;
 import minecrafttransportsimulator.mcinterface.IInterfaceRender;
+import minecrafttransportsimulator.mcinterface.IWrapperItemStack;
 import minecrafttransportsimulator.mcinterface.InterfaceManager;
 import minecrafttransportsimulator.rendering.GIFParser.GIFImageFrame;
 import minecrafttransportsimulator.rendering.GIFParser.ParsedGIF;
@@ -100,6 +101,7 @@ public class InterfaceRender implements IInterfaceRender {
     public static MultiBufferSource renderBuffer;
     public static Point3D renderCameraOffset = new Point3D();
     private static boolean renderingGUI;
+    private static GuiGraphics currentGuiGraphics;  // For native text/item rendering in mccore
     //Reusable Vector3f to avoid allocating a new one per-vertex during rendering
     private static final org.joml.Vector3f tempNormalVec = new org.joml.Vector3f();
 
@@ -846,6 +848,7 @@ public class InterfaceRender implements IInterfaceRender {
         matrixStack = mcGUI.pose();
         matrixStack.pushPose();
         renderingGUI = true;
+        currentGuiGraphics = mcGUI;  // Set for native text/item rendering
         MultiBufferSource.BufferSource guiBuffer = mcGUI.bufferSource();
         renderBuffer = guiBuffer;
 
@@ -859,6 +862,10 @@ public class InterfaceRender implements IInterfaceRender {
             // Skip modal GUIs (capturesPlayer) - they are rendered via Screen.render() in BuilderGUI
             // This makes them immune to other mods cancelling overlay events
             if (gui.capturesPlayer()) {
+                continue;
+            }
+            // Skip GUIs that render below vanilla - they're already rendered via registerBelowAll
+            if (gui.renderBelowVanilla()) {
                 continue;
             }
             // Check if screen dimensions have changed and force GUI re-initialization
@@ -920,6 +927,7 @@ public class InterfaceRender implements IInterfaceRender {
         }
         matrixStack.popPose();
         renderingGUI = false;
+        currentGuiGraphics = null;  // Clear after GUI rendering
     }
 
     /**
@@ -936,6 +944,7 @@ public class InterfaceRender implements IInterfaceRender {
         matrixStack = mcGUI.pose();
         matrixStack.pushPose();
         renderingGUI = true;
+        currentGuiGraphics = mcGUI;  // Set for native text/item rendering
         MultiBufferSource.BufferSource guiBuffer = mcGUI.bufferSource();
         renderBuffer = guiBuffer;
 
@@ -994,6 +1003,7 @@ public class InterfaceRender implements IInterfaceRender {
         matrixStack.popPose();
         matrixStack.popPose();
         renderingGUI = false;
+        currentGuiGraphics = null;  // Clear after GUI rendering
     }
 
     /**
@@ -1080,5 +1090,132 @@ public class InterfaceRender implements IInterfaceRender {
         RenderSystem.depthMask(true);
         RenderSystem.defaultBlendFunc();
     });
+
+    @Override
+    public void renderNativeText(String text, float x, float y, int color, float scale, boolean shadow, boolean rightAligned) {
+        if (currentGuiGraphics == null || text == null || text.isEmpty()) {
+            return;
+        }
+        net.minecraft.client.gui.Font font = Minecraft.getInstance().font;
+        var poseStack = currentGuiGraphics.pose();
+
+        poseStack.pushPose();
+        // MTS GUI renders with inverted Y-axis (scale 1, -1, 1), so we need to:
+        // 1. Undo the Y inversion by scaling Y by -1
+        // 2. Negate Y position since MTS uses negative Y for screen positions
+        poseStack.scale(scale, -scale, 1f);
+
+        float scaledX = x / scale;
+        float scaledY = -y / scale;  // Negate Y to convert from MTS coords
+
+        if (rightAligned) {
+            scaledX -= font.width(text);
+        }
+
+        currentGuiGraphics.drawString(font, text, scaledX, scaledY, color, shadow);
+        poseStack.popPose();
+    }
+
+    @Override
+    public float getNativeTextWidth(String text) {
+        if (text == null || text.isEmpty()) {
+            return 0;
+        }
+        return Minecraft.getInstance().font.width(text);
+    }
+
+    @Override
+    public void renderNativeItem(IWrapperItemStack stack, float x, float y, float scale) {
+        if (currentGuiGraphics == null || stack == null) {
+            return;
+        }
+        var poseStack = currentGuiGraphics.pose();
+
+        poseStack.pushPose();
+        poseStack.translate(x, y, 0);
+        poseStack.scale(scale, scale, 1f);
+
+        net.minecraft.world.item.ItemStack mcStack = ((WrapperItemStack) stack).stack;
+        currentGuiGraphics.renderFakeItem(mcStack, 0, 0);
+
+        poseStack.popPose();
+    }
+
+    /**
+     * Sets the current GuiGraphics context for native rendering.
+     * Called by overlay renderers before invoking mccore rendering.
+     */
+    public static void setCurrentGuiGraphics(GuiGraphics graphics) {
+        currentGuiGraphics = graphics;
+    }
+
+    /**
+     * Clears the current GuiGraphics context after rendering.
+     */
+    public static void clearCurrentGuiGraphics() {
+        currentGuiGraphics = null;
+    }
+
+    /**
+     * Renders a single GUI that wants below-vanilla timing.
+     * Called from ClientRenderingEvents for GUIs with renderBelowVanilla() == true.
+     */
+    public static void renderBelowVanillaGUI(GuiGraphics mcGUI, AGUIBase gui, int mouseX, int mouseY, int screenWidth, int screenHeight, float partialTicks) {
+        matrixStack = mcGUI.pose();
+        matrixStack.pushPose();
+        renderingGUI = true;
+        MultiBufferSource.BufferSource guiBuffer = mcGUI.bufferSource();
+        renderBuffer = guiBuffer;
+
+        // Set Y-axis to inverted to have correct orientation
+        matrixStack.scale(1.0F, -1.0F, 1.0F);
+
+        matrixStack.pushPose();
+        // Translate for proper z-ordering
+        matrixStack.translate(0, 0, -500);
+
+        // Render main pass (non-blended)
+        gui.render(mouseX, mouseY, false, partialTicks);
+        guiBuffer.endBatch();
+
+        // Render blended pass
+        RenderSystem.enableBlend();
+        gui.render(mouseX, mouseY, true, partialTicks);
+        guiBuffer.endBatch();
+        RenderSystem.disableBlend();
+
+        // Render item stacks in standard GUI reference frame
+        matrixStack.scale(1.0F, -1.0F, 1.0F);
+        for (GUIComponentItem component : stacksToRender) {
+            if ((WrapperItemStack) component.stackToRender != null) {
+                org.joml.Matrix4fStack modelViewStack = RenderSystem.getModelViewStack();
+                modelViewStack.pushMatrix();
+                modelViewStack.translate(0, 0, (float) (component.translation.z - 100));
+                if (component.scale != 1.0) {
+                    modelViewStack.scale(component.scale, component.scale, 1.0F);
+                    RenderSystem.applyModelViewMatrix();
+                    if (isPackItem(((WrapperItemStack) component.stackToRender).stack)) {
+                        renderPackItemPlaceholderScaled(mcGUI, component);
+                    } else {
+                        mcGUI.renderItem(((WrapperItemStack) component.stackToRender).stack, (int) (component.translation.x / component.scale), (int) (-component.translation.y / component.scale) + 1);
+                    }
+                } else {
+                    RenderSystem.applyModelViewMatrix();
+                    if (isPackItem(((WrapperItemStack) component.stackToRender).stack)) {
+                        renderPackItemPlaceholder(mcGUI, component);
+                    } else {
+                        mcGUI.renderItem(((WrapperItemStack) component.stackToRender).stack, (int) component.translation.x, (int) -component.translation.y);
+                    }
+                }
+                modelViewStack.popMatrix();
+                RenderSystem.applyModelViewMatrix();
+            }
+        }
+        stacksToRender.clear();
+
+        matrixStack.popPose();
+        matrixStack.popPose();
+        renderingGUI = false;
+    }
 
 }

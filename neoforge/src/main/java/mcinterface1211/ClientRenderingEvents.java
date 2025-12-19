@@ -1,5 +1,6 @@
 package mcinterface1211;
 
+import minecrafttransportsimulator.guis.components.AGUIBase;
 import net.minecraft.resources.ResourceLocation;
 import net.neoforged.neoforge.client.event.RegisterGuiLayersEvent;
 
@@ -7,35 +8,46 @@ import net.neoforged.neoforge.client.event.RegisterGuiLayersEvent;
  * Client-side rendering event handler for registering GUI layers.
  * Manually registered on the MOD event bus in InterfaceLoader.
  *
- * Following the same pattern as Superb Warfare's ClientRenderHandler (1.21.1 version).
- *
  * @author alexispace
  */
 public class ClientRenderingEvents {
 
-    // Resource location for our weapon HUD layer
-    public static final ResourceLocation WEAPON_HUD_LAYER = ResourceLocation.fromNamespaceAndPath(InterfaceLoader.MODID, "weapon_hud");
-
     /**
      * Register custom GUI layers/overlays.
      * This is the NeoForge 1.21.1 equivalent of Forge's RegisterGuiOverlaysEvent.
-     * By registering as a proper GUI layer, we get a clean GuiGraphics context
-     * without MTS's coordinate transforms.
      *
-     * Follows the exact same pattern as Superb Warfare 1.21.1's ClientRenderHandler.registerOverlays()
+     * GUIs that return true from renderBelowVanilla() are rendered here,
+     * below all vanilla HUD elements (health, hunger, hotbar, etc.).
      */
     public static void onRegisterGuiLayers(RegisterGuiLayersEvent event) {
-        // Register our weapon HUD overlay below all (so it renders early, like Superb Warfare does)
-        // Superb Warfare uses registerBelowAll for most of their overlays
+        // Register overlay that renders below all vanilla HUD elements
         event.registerBelowAll(
-            WEAPON_HUD_LAYER,
-            (guiGraphics, deltaTracker) -> {
-                // Get screen dimensions exactly like Superb Warfare's RenderContext
+            ResourceLocation.fromNamespaceAndPath(InterfaceLoader.MODID, "below_vanilla_overlay"),
+            (guiGraphics, partialTick) -> {
+                // Set the GuiGraphics context for native rendering
+                InterfaceRender.setCurrentGuiGraphics(guiGraphics);
+
+                // Render all GUIs that want below-vanilla timing
+                float partialTicks = partialTick.getGameTimeDeltaPartialTick(true);
                 int screenWidth = guiGraphics.guiWidth();
                 int screenHeight = guiGraphics.guiHeight();
+                int mouseX = 0;  // Not needed for HUD overlays
+                int mouseY = 0;
 
-                // Render the weapon HUD with clean context (exactly like Superb Warfare)
-                WeaponHUDOverlay.render(guiGraphics, screenWidth, screenHeight);
+                for (AGUIBase gui : AGUIBase.activeGUIs) {
+                    if (gui.renderBelowVanilla() && !gui.capturesPlayer()) {
+                        // Initialize GUI if needed
+                        if (gui.components.isEmpty() || gui.hasScreenSizeChanged(screenWidth, screenHeight)) {
+                            gui.setupComponentsInit(screenWidth, screenHeight);
+                        }
+
+                        // Render the GUI using InterfaceRender's GUI rendering logic
+                        InterfaceRender.renderBelowVanillaGUI(guiGraphics, gui, mouseX, mouseY, screenWidth, screenHeight, partialTicks);
+                    }
+                }
+
+                // Clear the context after rendering
+                InterfaceRender.clearCurrentGuiGraphics();
             }
         );
     }
