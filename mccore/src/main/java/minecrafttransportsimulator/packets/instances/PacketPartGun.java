@@ -5,7 +5,9 @@ import minecrafttransportsimulator.entities.instances.EntityPlayerGun;
 import minecrafttransportsimulator.entities.instances.PartGun;
 import minecrafttransportsimulator.items.instances.ItemBullet;
 import minecrafttransportsimulator.mcinterface.AWrapperWorld;
+import minecrafttransportsimulator.mcinterface.InterfaceManager;
 import minecrafttransportsimulator.packets.components.APacketEntity;
+import minecrafttransportsimulator.systems.ConfigSystem;
 
 /**
  * Packet used to send signals to guns.  This can be either to change the state of the gun,
@@ -106,11 +108,17 @@ public class PacketPartGun extends APacketEntity<PartGun> {
                 break;
             }
             case TRIGGER_ON: {
+                if (ConfigSystem.settings.general.devMode.value) {
+                    InterfaceManager.coreInterface.logError("[GUN DEBUG] TRIGGER_ON packet received, isClient=" + world.isClient());
+                }
                 gun.playerHoldingTrigger = true;
                 gun.playerPressedTrigger = true;
                 break;
             }
             case TRIGGER_OFF: {
+                if (ConfigSystem.settings.general.devMode.value) {
+                    InterfaceManager.coreInterface.logError("[GUN DEBUG] TRIGGER_OFF packet received, isClient=" + world.isClient());
+                }
                 gun.playerHoldingTrigger = false;
                 break;
             }

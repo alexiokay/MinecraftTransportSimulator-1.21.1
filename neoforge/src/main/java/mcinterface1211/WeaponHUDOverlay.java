@@ -76,6 +76,9 @@ public class WeaponHUDOverlay {
      * INSTANT DISPLAY: Like Superb Warfare, we check the held item directly
      * instead of waiting for EntityPlayerGun to spawn. This makes the HUD
      * appear instantly when switching items.
+     *
+     * DUAL HUD SUPPORT: Can render both handheld gun HUD (bottom-right) and
+     * vehicle-mounted gun HUD (top-right) simultaneously.
      */
     public static void render(GuiGraphics guiGraphics, int screenWidth, int screenHeight) {
         // Check if we should render (player has active gun with HUD enabled)
@@ -84,12 +87,11 @@ public class WeaponHUDOverlay {
             return;
         }
 
-        PartGun gun = null;
-        JSONGunHUD hudDef = null;
+        // === HANDHELD GUN HUD (bottom-right) ===
         ItemPartGun heldGunItem = null;
         IWrapperNBT heldGunData = null;
 
-        // INSTANT CHECK: First check held item directly (like Superb Warfare's player.mainHandItem)
+        // INSTANT CHECK: Check held item directly (like Superb Warfare's player.mainHandItem)
         // This makes HUD appear instantly without waiting for EntityPlayerGun entity to spawn
         AItemBase heldItem = player.getHeldItem();
         if (heldItem instanceof ItemPartGun) {
@@ -97,7 +99,6 @@ public class WeaponHUDOverlay {
             // Check if it's a handheld gun with HUD enabled
             if (gunItem.definition.gun.handHeld && gunItem.definition.gunHUD != null && gunItem.definition.gunHUD.enabled) {
                 heldGunItem = gunItem;
-                hudDef = gunItem.definition.gunHUD;
                 // Get NBT data from held stack for ammo count and lastLoadedBullet
                 IWrapperItemStack heldStack = player.getHeldStack();
                 if (heldStack != null) {
@@ -106,42 +107,41 @@ public class WeaponHUDOverlay {
             }
         }
 
-        // Check for vehicle gun (if no handheld gun)
-        // NOTE: For handheld guns, we read from ItemStack NBT (Superb Warfare approach)
-        // gun entity is only used for vehicle-mounted guns
-        if (heldGunItem == null) {
-            if (player.getEntityRiding() instanceof PartSeat) {
-                PartSeat seat = (PartSeat) player.getEntityRiding();
-                if (seat.canControlGuns && seat.activeGunItem != null && seat.gunGroups.containsKey(seat.activeGunItem)) {
-                    java.util.List<PartGun> guns = seat.gunGroups.get(seat.activeGunItem);
-                    if (guns != null && !guns.isEmpty() && seat.gunIndex < guns.size()) {
-                        gun = guns.get(seat.gunIndex);
-                        hudDef = gun.definition.gunHUD;
-                    }
+        // Render handheld gun HUD at bottom-right
+        if (heldGunItem != null) {
+            renderHandheldGunHUD(guiGraphics, screenWidth, screenHeight, heldGunItem, heldGunData);
+        }
+
+        // === VEHICLE GUN HUD (top-right) ===
+        // Check for vehicle gun - renders independently of handheld gun
+        if (player.getEntityRiding() instanceof PartSeat) {
+            PartSeat seat = (PartSeat) player.getEntityRiding();
+            if (seat.canControlGuns && seat.activeGunItem != null && seat.gunGroups.containsKey(seat.activeGunItem)) {
+                java.util.List<PartGun> guns = seat.gunGroups.get(seat.activeGunItem);
+                if (guns != null && !guns.isEmpty() && seat.gunIndex < guns.size()) {
+                    PartGun vehicleGun = guns.get(seat.gunIndex);
+                    // Vehicle guns use legacy text HUD for now (rendered by GUIOverlay)
+                    // TODO: Add modern HUD for vehicle guns at top-right position
+                    renderVehicleGunHUD(guiGraphics, screenWidth, screenHeight, vehicleGun, seat);
                 }
             }
         }
+    }
 
-        // Only render if we have HUD enabled
+    /**
+     * Renders the handheld gun HUD at the bottom-right of the screen (Superb Warfare style).
+     */
+    private static void renderHandheldGunHUD(GuiGraphics guiGraphics, int screenWidth, int screenHeight,
+                                              ItemPartGun heldGunItem, IWrapperNBT heldGunData) {
+        JSONGunHUD hudDef = heldGunItem.definition.gunHUD;
         if (hudDef == null || !hudDef.enabled) {
             return;
         }
-
-        // Like Superb Warfare: ALWAYS render HUD immediately, even if NBT is missing/incomplete
-        // Superb Warfare's AmmoBarOverlay (line 52) calls from(stack) with NO checks - just reads NBT
-        // Fire mode code has fallback logic to use gun definition defaults when NBT is missing (lines 340-347)
-        // This ensures instant HUD display when switching weapons (no delay waiting for entity spawn/sync)
 
         int x = screenWidth;
         int y = screenHeight;
         Font font = Minecraft.getInstance().font;
         var poseStack = guiGraphics.pose();
-
-        // === DATA EXTRACTION ===
-        // Read from ItemStack NBT (synced every tick by inventoryTick)
-        if (heldGunItem == null) {
-            return;
-        }
 
         ItemStack gunItemStack = ((WrapperItemStack) heldGunItem.getNewStack(null)).stack;
         String gunName = heldGunItem.getItemName();
@@ -391,5 +391,52 @@ public class WeaponHUDOverlay {
             8f, 8f,
             8f, 8f
         );
+    }
+
+    /**
+     * Renders the vehicle-mounted gun HUD at the top-right of the screen.
+     * This is a simplified HUD showing gun name, ammo count, and gun index.
+     */
+    private static void renderVehicleGunHUD(GuiGraphics guiGraphics, int screenWidth, int screenHeight,
+                                             PartGun vehicleGun, PartSeat seat) {
+        // Check if gun has modern HUD enabled - if not, let legacy GUIOverlay handle it
+        if (vehicleGun.definition.gunHUD == null || !vehicleGun.definition.gunHUD.enabled) {
+            return;
+        }
+
+        Font font = Minecraft.getInstance().font;
+        var poseStack = guiGraphics.pose();
+
+        // Position at top-right of screen
+        int x = screenWidth;
+        int y = 10;  // 10 pixels from top
+
+        // Get gun info
+        String gunName = vehicleGun.cachedItem.getItemName();
+        String ammoText = vehicleGun.getBulletText();
+        int gunIndex = seat.gunIndex + 1;
+        boolean fireSolo = vehicleGun.cachedItem.definition.gun.fireSolo;
+
+        // === GUN NAME (top line) ===
+        poseStack.pushPose();
+        poseStack.scale(0.9f, 0.9f, 1f);
+        float gunNameX = x / 0.9f - (10 + font.width(gunName)) / 0.9f;
+        float gunNameY = y / 0.9f;
+        guiGraphics.drawString(font, gunName, gunNameX, gunNameY, 0xFFFFFF, true);
+        poseStack.popPose();
+
+        // === GUN INDEX (if fireSolo) ===
+        if (fireSolo) {
+            String indexText = "[" + gunIndex + "]";
+            guiGraphics.drawString(font, indexText, x - 10 - font.width(indexText), y + 12, 0xAAAAAA, true);
+        }
+
+        // === AMMO COUNT (larger, below name) ===
+        poseStack.pushPose();
+        poseStack.scale(1.2f, 1.2f, 1f);
+        float ammoX = x / 1.2f - (10 + font.width(ammoText)) / 1.2f;
+        float ammoY = (y + 22) / 1.2f;
+        guiGraphics.drawString(font, ammoText, ammoX, ammoY, 0xFFFF00, true);  // Yellow for visibility
+        poseStack.popPose();
     }
 }

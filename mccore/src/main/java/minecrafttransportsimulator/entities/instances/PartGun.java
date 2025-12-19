@@ -562,7 +562,9 @@ public class PartGun extends APart {
                             firedSinceRequested = true;
                             cycledGun = true;
                             lastMillisecondFired = System.currentTimeMillis();
-                            InterfaceManager.coreInterface.logError("[GUN DEBUG] FIRED! isClient=" + world.isClient());
+                            if (ConfigSystem.settings.general.devMode.value) {
+                                InterfaceManager.coreInterface.logError("[GUN DEBUG] FIRED! isClient=" + world.isClient());
+                            }
                             handleFireModeAfterShot();
                             if (definition.gun.muzzleGroups.size() == ++currentMuzzleGroupIndex) {
                                 currentMuzzleGroupIndex = 0;
@@ -575,7 +577,9 @@ public class PartGun extends APart {
                             firedThisTick = true;
                             firedSinceRequested = true;
                             lastMillisecondFired = System.currentTimeMillis();
-                            InterfaceManager.coreInterface.logError("[GUN DEBUG] FIRED (clipless)! isClient=" + world.isClient());
+                            if (ConfigSystem.settings.general.devMode.value) {
+                                InterfaceManager.coreInterface.logError("[GUN DEBUG] FIRED (clipless)! isClient=" + world.isClient());
+                            }
                             handleFireModeAfterShot();
                         }
                         cycledGun = true;
@@ -780,7 +784,7 @@ public class PartGun extends APart {
         firingRequestedVar.setTo(shouldRequestFiring ? 1 : 0, false);
 
         // DEBUG: Log trigger state when something interesting happens
-        if (isSemiMode && (playerPressedTrigger || playerHoldingTrigger)) {
+        if (ConfigSystem.settings.general.devMode.value && isSemiMode && (playerPressedTrigger || playerHoldingTrigger)) {
             InterfaceManager.coreInterface.logError("[GUN DEBUG] setVarDefaults: pressed=" + playerPressedTrigger +
                 " holding=" + playerHoldingTrigger + " firedSince=" + firedSinceRequested +
                 " cooldown=" + cooldownTimeRemaining + " canFire=" + canFireBasedOnMode +

@@ -76,6 +76,7 @@ public class GUIOverlay extends AGUIBase {
         //Legacy text only shows for guns without gunHUD defined
         gunLabel.visible = false;
         if (!InterfaceManager.clientInterface.isChatOpen()) {
+            // Check handheld gun first (legacy HUD only if no modern gunHUD defined)
             EntityPlayerGun playerGun = EntityPlayerGun.playerClientGuns.get(player.getID());
             if (playerGun != null && playerGun.activeGun != null) {
                 // Only show legacy text if gun doesn't have modern HUD (gunHUD) defined
@@ -84,27 +85,34 @@ public class GUIOverlay extends AGUIBase {
                     gunLabel.visible = true;
                     gunLabel.text = "Gun:" + playerGun.activeGun.cachedItem.getItemName() + " Loaded:" + playerGun.activeGun.getBulletText();
                 }
-            } else {
-                AEntityB_Existing entityRiding = player.getEntityRiding();
-                if (entityRiding instanceof PartSeat) {
-                    PartSeat seat = (PartSeat) entityRiding;
-                    if (seat.canControlGuns) {
-                        // Check if active gun has modern HUD - if so, WeaponHUDOverlay handles it
-                        boolean hasModernHUD = seat.activeGunItem != null &&
-                            seat.activeGunItem.definition.gunHUD != null &&
-                            seat.activeGunItem.definition.gunHUD.enabled;
+            }
 
-                        if (!hasModernHUD) {
+            // Check vehicle gun INDEPENDENTLY (not in else branch)
+            // This allows both handheld and vehicle gun HUDs to show simultaneously
+            AEntityB_Existing entityRiding = player.getEntityRiding();
+            if (entityRiding instanceof PartSeat) {
+                PartSeat seat = (PartSeat) entityRiding;
+                if (seat.canControlGuns) {
+                    // Check if active gun has modern HUD - if so, WeaponHUDOverlay handles it
+                    boolean hasModernHUD = seat.activeGunItem != null &&
+                        seat.activeGunItem.definition.gunHUD != null &&
+                        seat.activeGunItem.definition.gunHUD.enabled;
+
+                    if (!hasModernHUD) {
+                        // If handheld gun is showing legacy text, append vehicle gun info
+                        if (gunLabel.visible) {
+                            gunLabel.text += " | Vehicle Gun:";
+                        } else {
                             gunLabel.visible = true;
                             gunLabel.text = "Active Gun:";
-                            if (seat.activeGunItem != null) {
-                                gunLabel.text += seat.activeGunItem.getItemName();
-                                if (seat.activeGunItem.definition.gun.fireSolo) {
-                                    gunLabel.text += " [" + (seat.gunIndex + 1) + "]";
-                                }
-                            } else {
-                                gunLabel.text += "None";
+                        }
+                        if (seat.activeGunItem != null) {
+                            gunLabel.text += seat.activeGunItem.getItemName();
+                            if (seat.activeGunItem.definition.gun.fireSolo) {
+                                gunLabel.text += " [" + (seat.gunIndex + 1) + "]";
                             }
+                        } else {
+                            gunLabel.text += "None";
                         }
                     }
                 }
