@@ -558,27 +558,27 @@ public class PartGun extends APart {
                             }
 
                             //Update states.
-                            cooldownTimeRemaining = (int) fireDelayVar.currentValue;
                             firedThisTick = true;
                             firedSinceRequested = true;
                             cycledGun = true;
                             lastMillisecondFired = System.currentTimeMillis();
-
-                            // Handle burst mode - initialize or decrement burst counter
-                            if ("burst".equals(getCurrentFireMode())) {
-                                if (burstShotsRemaining == 0) {
-                                    // First shot of burst - initialize counter
-                                    burstShotsRemaining = definition.gun.burstCount > 0 ? definition.gun.burstCount - 1 : 2; // -1 because we just fired
-                                } else {
-                                    burstShotsRemaining--;
-                                }
-                            }
+                            handleFireModeAfterShot();
                             if (definition.gun.muzzleGroups.size() == ++currentMuzzleGroupIndex) {
                                 currentMuzzleGroupIndex = 0;
                             }
                         }
                     } else if (camOffset == 0) {
-                        //Got to end of cam with no bullets, cycle gun.
+                        //Got to end of cam with no bullets.
+                        //For clipless guns, simulate firing for animations/particles.
+                        if (definition.gun.isClipless) {
+                            firedThisTick = true;
+                            firedSinceRequested = true;
+                            lastMillisecondFired = System.currentTimeMillis();
+                            handleFireModeAfterShot();
+
+                            // Demote state so !gun_firing becomes true for one tick (triggers particles)
+                            state = state.demote(GunState.CONTROLLED);
+                        }
                         cycledGun = true;
                     }
                     if (cycledGun) {
@@ -595,10 +595,8 @@ public class PartGun extends APart {
                 } else {
                     state = state.demote(GunState.FIRING_REQUESTED);
                 }
-            } else {
-                firedSinceRequested = false;
-                burstShotsRemaining = 0; // Reset burst when trigger released
             }
+            // Note: trigger release reset is handled in setVariableDefaults() which runs before update()
 
             //Handle reload delay and recoil.
             if (state.isAtLeast(GunState.FIRING_CURRENTLY) || cooldownTimeRemaining != 0) {
@@ -749,21 +747,33 @@ public class PartGun extends APart {
         boolean isSemiMode = "semi".equals(currentMode);
         boolean isAutoMode = "auto".equals(currentMode);
 
-        // For semi and burst: stop after firing (until trigger released)
-        // For burst: also allow continued firing while burstShotsRemaining > 0
+        // Reset firedSinceRequested when trigger is released AND no burst in progress
+        if (!playerHoldingTrigger && burstShotsRemaining == 0) {
+            firedSinceRequested = false;
+        }
+
+        // Determine if we can fire based on mode:
+        // Semi: one shot per trigger press (block after firing until trigger released)
+        // Burst: continue active burst, or start new burst (one burst per trigger press)
+        // Auto: continuous fire while trigger held
         boolean canFireBasedOnMode;
         if (isAutoMode) {
-            canFireBasedOnMode = true; // Always can fire in auto
+            canFireBasedOnMode = true;
         } else if (isBurstMode) {
-            canFireBasedOnMode = !firedSinceRequested || burstShotsRemaining > 0;
+            // Burst in progress - always continue
+            // No burst - only start if trigger freshly pressed (firedSinceRequested == false)
+            canFireBasedOnMode = burstShotsRemaining > 0 || !firedSinceRequested;
         } else {
-            canFireBasedOnMode = !firedSinceRequested; // Semi-auto
+            // Semi-auto: one shot per trigger press
+            canFireBasedOnMode = !firedSinceRequested;
         }
 
         isSemiAutoVar.setTo((isSemiMode || isBurstMode) ? 1 : 0, false);
         canLockTargetsVar.setTo(definition.gun.canLockTargets ? 1 : 0, false);
         twoHandedVar.setTo(definition.gun.isTwoHanded ? 1 : 0, false);
-        ableToFireVar.setTo(windupTimeCurrent == definition.gun.windupTime && cooldownTimeRemaining == 0 && !isReloading && canFireBasedOnMode ? 1 : 0, false);
+        // Use cooldownTimeRemaining <= 1 because cooldown is decremented in update() BEFORE the firing check,
+        // so when cooldown is 1 here, it will be 0 by the time the gun checks if it can fire
+        ableToFireVar.setTo(windupTimeCurrent == definition.gun.windupTime && cooldownTimeRemaining <= 1 && !isReloading && canFireBasedOnMode ? 1 : 0, false);
         firingRequestedVar.setTo(playerHoldingTrigger ? 1 : 0, false);
     }
 
@@ -962,8 +972,8 @@ public class PartGun extends APart {
                 }
             }
 
-            //If we are holding the trigger, request to fire.
-            if (firingRequestedVar.isActive) {
+            //If we are holding the trigger, or burst shots remaining, request to fire.
+            if (firingRequestedVar.isActive || burstShotsRemaining > 0) {
                 state = state.promote(GunState.FIRING_REQUESTED);
             } else {
                 state = state.demote(GunState.CONTROLLED);
@@ -1255,6 +1265,44 @@ public class PartGun extends APart {
         }
         // Backward compatibility: use legacy isSemiAuto boolean
         return definition.gun.isSemiAuto ? "semi" : "auto";
+    }
+
+    /**
+     * Handles fire mode logic after a shot is fired.
+     * Updates burst state and sets appropriate cooldown based on current fire mode.
+     * Called from both normal gun and clipless gun firing paths.
+     */
+    private void handleFireModeAfterShot() {
+        String fireMode = getCurrentFireMode();
+
+        // Handle burst mode state
+        if ("burst".equals(fireMode)) {
+            if (burstShotsRemaining == 0) {
+                // Starting new burst - set remaining shots (excluding the one that just fired)
+                burstShotsRemaining = definition.gun.burstCount > 0 ? definition.gun.burstCount - 1 : 2;
+            } else {
+                // Continue burst
+                burstShotsRemaining--;
+                // When burst completes, reset firedSinceRequested so next click can start new burst
+                if (burstShotsRemaining == 0) {
+                    firedSinceRequested = false;
+                }
+            }
+        }
+
+        // Set cooldown based on fire mode
+        if ("burst".equals(fireMode)) {
+            if (burstShotsRemaining > 0) {
+                // Fast delay between burst shots
+                cooldownTimeRemaining = 4;
+            } else {
+                // Burst complete - no cooldown, can start next burst immediately on next click
+                cooldownTimeRemaining = 0;
+            }
+        } else {
+            // Auto/Semi: use fireDelay from JSON
+            cooldownTimeRemaining = (int) fireDelayVar.currentValue;
+        }
     }
 
     /**
