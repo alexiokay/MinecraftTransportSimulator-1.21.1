@@ -50,6 +50,7 @@ public final class ControlSystem {
     private static double throttleRequestLastCheck;
     private static double brakeRequestLastCheck;
     private static boolean wasUsingShifter = false;
+    private static int lastShifterGear = -1;
 
     private static EntityInteractResult interactResult = null;
 
@@ -261,6 +262,8 @@ public final class ControlSystem {
 
     private static void controlGun(AEntityF_Multipart<?> multipart, ControlsKeyboard gunTrigger, ControlsKeyboard gunSwitch) {
         boolean gunSwitchPressedThisScan = gunSwitch.isPressed();
+        boolean ammoNextPressed = ControlsKeyboard.GENERAL_AMMO_NEXT.isPressed();
+        boolean ammoPrevPressed = ControlsKeyboard.GENERAL_AMMO_PREV.isPressed();
         for (APart part : multipart.allParts) {
             if (part instanceof PartGun) {
                 PartGun gun = (PartGun) part;
@@ -269,6 +272,13 @@ public final class ControlSystem {
                         InterfaceManager.packetInterface.sendToServer(new PacketPartGun(gun, PacketPartGun.Request.TRIGGER_ON));
                     } else {
                         InterfaceManager.packetInterface.sendToServer(new PacketPartGun(gun, PacketPartGun.Request.TRIGGER_OFF));
+                    }
+                    // Ammo type switching (Left/Right arrows)
+                    if (ammoNextPressed) {
+                        InterfaceManager.packetInterface.sendToServer(new PacketPartGun(gun, PacketPartGun.Request.CYCLE_AMMO_NEXT));
+                    }
+                    if (ammoPrevPressed) {
+                        InterfaceManager.packetInterface.sendToServer(new PacketPartGun(gun, PacketPartGun.Request.CYCLE_AMMO_PREV));
                     }
                 }
             } else if (part instanceof PartSeat) {
@@ -609,13 +619,17 @@ public final class ControlSystem {
                 gearNumber = 11;
             }
             wasUsingShifter = true;
-            powered.engines.forEach(engine -> {
-                InterfaceManager.packetInterface.sendToServer(new PacketEntityVariableSet(engine.shiftSelectionVar, gearNumber));
-            });
+            if (gearNumber != lastShifterGear) {
+                lastShifterGear = gearNumber;
+                powered.engines.forEach(engine -> {
+                    InterfaceManager.packetInterface.sendToServer(new PacketEntityVariableSet(engine.shiftSelectionVar, gearNumber));
+                });
+            }
         } else {
             // Clear shiftSelectionVar when switching from shifter mode to normal mode
             if (wasUsingShifter) {
                 wasUsingShifter = false;
+                lastShifterGear = -1;
                 powered.engines.forEach(engine -> {
                     InterfaceManager.packetInterface.sendToServer(new PacketEntityVariableSet(engine.shiftSelectionVar, 0));
                 });
@@ -716,6 +730,8 @@ public final class ControlSystem {
         GENERAL_FIREMODE(ControlsJoystick.GENERAL_FIREMODE, true, "N", LanguageSystem.INPUT_GUN_FIREMODE),
         GENERAL_FIREMODE_UP(ControlsJoystick.GENERAL_FIREMODE_UP, true, "UP", LanguageSystem.INPUT_GUN_FIREMODE_UP),
         GENERAL_FIREMODE_DOWN(ControlsJoystick.GENERAL_FIREMODE_DOWN, true, "DOWN", LanguageSystem.INPUT_GUN_FIREMODE_DOWN),
+        GENERAL_AMMO_NEXT(ControlsJoystick.GENERAL_AMMO_NEXT, true, "RIGHT", LanguageSystem.INPUT_GUN_AMMO_NEXT),
+        GENERAL_AMMO_PREV(ControlsJoystick.GENERAL_AMMO_PREV, true, "LEFT", LanguageSystem.INPUT_GUN_AMMO_PREV),
 
         AIRCRAFT_YAW_R(ControlsJoystick.AIRCRAFT_YAW, false, "L", LanguageSystem.INPUT_YAW_R),
         AIRCRAFT_YAW_L(ControlsJoystick.AIRCRAFT_YAW, false, "J", LanguageSystem.INPUT_YAW_L),
@@ -822,6 +838,8 @@ public final class ControlSystem {
         GENERAL_FIREMODE(false, true, LanguageSystem.INPUT_GUN_FIREMODE),
         GENERAL_FIREMODE_UP(false, true, LanguageSystem.INPUT_GUN_FIREMODE_UP),
         GENERAL_FIREMODE_DOWN(false, true, LanguageSystem.INPUT_GUN_FIREMODE_DOWN),
+        GENERAL_AMMO_NEXT(false, true, LanguageSystem.INPUT_GUN_AMMO_NEXT),
+        GENERAL_AMMO_PREV(false, true, LanguageSystem.INPUT_GUN_AMMO_PREV),
 
         AIRCRAFT_CAMLOCK(false, true, LanguageSystem.INPUT_CAMLOCK),
         AIRCRAFT_YAW(true, false, LanguageSystem.INPUT_YAW),
